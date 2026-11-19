@@ -63,7 +63,7 @@ MONGODB_URI=mongodb://127.0.0.1:27017 npm test
 | `HOST`, `PORT` | `127.0.0.1`, `3000` |
 | `TRUST_PROXY` | off |
 | `MONGODB_URI`, `MONGODB_DB` | none, `url_jp_ai` |
-| `OPERATOR_NAME`, `CONTACT_EMAIL` | `QA.JP.AI`, `qa@email.jp.ai` |
+| `OPERATOR_NAME`, `CONTACT_EMAIL` | `Agentic AI LLC`, `qa@email.jp.ai` |
 | `LIMIT_PER_IP_PER_MINUTE`, `LIMIT_PER_IP_PER_DAY`, `LIMIT_TOTAL_PER_DAY` | 3, 30, 3000 |
 | `REUSE_RESULT_MINUTES` | 10 |
 | `MAX_CONCURRENT_SCANS`, `MAX_QUEUED_SCANS`, `SCAN_BUDGET_SECONDS` | 4, 16, 30 |
@@ -72,7 +72,6 @@ MONGODB_URI=mongodb://127.0.0.1:27017 npm test
 ## Before going public
 
 - The terms and privacy policy are drafts; have them reviewed by a lawyer.
-- Name the operator (`OPERATOR_NAME`) as it should appear in the privacy policy.
 - Run the MongoDB store tests against the server's MongoDB.
 
 ## Licence

@@ -70,7 +70,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     trustProxy: env.TRUST_PROXY === '1' || env.TRUST_PROXY === 'true',
     mongoUri: env.MONGODB_URI || undefined,
     mongoDb: env.MONGODB_DB ?? 'url_jp_ai',
-    operatorName: env.OPERATOR_NAME ?? 'QA.JP.AI',
+    operatorName: env.OPERATOR_NAME ?? 'Agentic AI LLC',
     contactEmail: env.CONTACT_EMAIL ?? 'qa@email.jp.ai',
     sourceUrl: 'https://github.com/QAJPAI/qa-url-ai-scanner',
     engineSourceUrl: 'https://github.com/QAJPAI/qa-jp-ai-scanner',

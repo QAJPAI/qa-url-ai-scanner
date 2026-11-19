@@ -299,6 +299,7 @@ test('the privacy policy states the retention actually configured', async () => 
 
 test('settings: safe defaults and refused values', () => {
   const c = loadConfig({});
+  assert.equal(c.operatorName, 'Agentic AI LLC');
   assert.equal(c.host, '127.0.0.1');
   assert.equal(c.trustProxy, false);
   assert.ok(c.limits.perIpPerMinute > 0 && c.limits.totalPerDay > 0);

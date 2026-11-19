@@ -19,7 +19,7 @@ module.exports = {
         TRUST_PROXY: '1',
         MONGODB_URI: 'mongodb://127.0.0.1:27017', // CHANGE if MongoDB needs credentials
         MONGODB_DB: 'url_jp_ai',
-        OPERATOR_NAME: 'QA.JP.AI', // CHANGE: the operator named in the privacy policy
+        OPERATOR_NAME: 'Agentic AI LLC', // the operator named in the terms and privacy policy
         CONTACT_EMAIL: 'qa@email.jp.ai',
       },
     },

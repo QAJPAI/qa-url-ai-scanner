@@ -60,7 +60,8 @@ Still open for step 1:
 - [ ] Switch the engine dependency from `file:../qa-jp-ai-scanner` to
       `github:QAJPAI/qa-jp-ai-scanner#v0.8.0` once that tag is pushed.
 - [ ] Run the MongoDB store tests on the server (`MONGODB_URI=… npm test`).
-- [ ] Deploy behind nginx; name the operator in the privacy policy.
+- [ ] Deploy behind nginx.
+- [x] Operator in the terms and privacy policy: Agentic AI LLC (iQi, 2026-11-20).
 
 ## Step 2: owner results
 
