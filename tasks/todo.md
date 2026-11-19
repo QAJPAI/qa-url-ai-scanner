@@ -82,8 +82,8 @@ Still open for step 1:
 Still open for step 2:
 - [ ] Resend: account, url.jp.ai domain verified (SPF, DKIM), `RESEND_API_KEY` on the server.
 - [ ] `SESSION_SECRET` on the server.
-- [ ] Decide whether to tell a domain's admin address when someone unlocks
-      details by email (the engine suggests it for large organisations).
+- [x] Admin-address notice when details are unlocked by email: not for now;
+      the audit log records it (iQi, 2026-11-20). Revisit after the test run.
 - [ ] Switch the engine dependency to `github:QAJPAI/qa-jp-ai-scanner#v0.9.0` once pushed.
 
 ## Step 3
