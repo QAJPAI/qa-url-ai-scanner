@@ -67,6 +67,8 @@ export interface Config {
   /** Run active checks (e.g. requesting /.env) for verified owners. The off switch. */
   activeChecks: boolean;
   mail: MailConfig;
+  /** Beta (test operation): a notice on every page, and nothing is indexed by search engines. */
+  beta: boolean;
   production: boolean;
   limits: Limits;
 }
@@ -96,6 +98,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     // Development only: a new secret per start, so owners are signed out on restart.
     sessionSecret = randomBytes(32).toString('base64url');
   }
+  const betaRaw = (env.SITE_BETA ?? 'off').toLowerCase();
+  if (!['on', 'off'].includes(betaRaw)) throw new Error('SITE_BETA must be on or off');
   const activeRaw = (env.ACTIVE_CHECKS ?? 'on').toLowerCase();
   if (!['on', 'off'].includes(activeRaw)) throw new Error('ACTIVE_CHECKS must be on or off');
   return {
@@ -114,6 +118,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     sessionSecret,
     activeChecks: activeRaw === 'on',
     mail: { resendApiKey: env.RESEND_API_KEY || undefined, from: env.MAIL_FROM ?? 'url.jp.ai <noreply@url.jp.ai>' },
+    beta: betaRaw === 'on',
     production,
     limits: {
       perIpPerMinute: int(env, 'LIMIT_PER_IP_PER_MINUTE', 3, 1, 1000),

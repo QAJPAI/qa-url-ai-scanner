@@ -84,7 +84,8 @@ Still open for step 2:
 - [ ] `SESSION_SECRET` on the server.
 - [x] Admin-address notice when details are unlocked by email: not for now;
       the audit log records it (iQi, 2026-11-20). Revisit after the test run.
-- [ ] Switch the engine dependency to `github:QAJPAI/qa-jp-ai-scanner#v0.9.0` once pushed.
+- [x] Engine dependency: `github:QAJPAI/qa-jp-ai-scanner#v0.9.0` (clean `npm ci` with SSH blocked: OK).
+- [x] Beta switch `SITE_BETA=on` for the test run: β notice on every page, noindex everywhere, robots.txt disallows all.
 
 ## Step 3
 

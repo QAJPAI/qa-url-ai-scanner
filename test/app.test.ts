@@ -301,6 +301,25 @@ test('the privacy policy states the retention actually configured', async () => 
   assert.match(body, /テスト運営/);
 });
 
+test('beta: a notice on every page, and nothing is indexed', async () => {
+  const beta = await start({ env: { SITE_BETA: 'on' } });
+  for (const path of ['/', '/about', '/terms', '/privacy', '/owner?u=example.jp', '/nope']) {
+    const r = await fetch(beta.base + path);
+    assert.equal(r.headers.get('x-robots-tag'), 'noindex, nofollow', path);
+    const body = await text(r);
+    assert.match(body, /β版（テスト運用中）です/, path);
+    assert.match(body, /<meta name="robots" content="noindex, nofollow">/, path);
+  }
+  assert.equal(await text(await fetch(beta.base + '/robots.txt')), 'User-agent: *\nDisallow: /\n');
+
+  const normal = await start();
+  const home = await fetch(normal.base + '/');
+  assert.equal(home.headers.get('x-robots-tag'), null);
+  assert.equal((await text(home)).includes('β版'), false);
+  assert.match(await text(await fetch(normal.base + '/robots.txt')), /Disallow: \/owner/);
+  assert.throws(() => loadConfig({ SITE_BETA: 'yes' }), /on or off/);
+});
+
 test('settings: safe defaults and refused values', () => {
   const c = loadConfig({});
   assert.equal(c.operatorName, 'Agentic AI LLC');

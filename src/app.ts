@@ -31,7 +31,9 @@ export interface AppDeps {
 const MINUTE = 60_000;
 const DAY = 24 * 60 * MINUTE;
 const RESULT_ID = /^[A-Za-z0-9_-]{22}$/;
-const ROBOTS = 'User-agent: *\nDisallow: /r/\n';
+const ROBOTS = 'User-agent: *\nDisallow: /r/\nDisallow: /owner\n';
+// Beta: nothing at all is to be indexed.
+const ROBOTS_BETA = 'User-agent: *\nDisallow: /\n';
 
 export type Handler = (req: IncomingMessage, res: ServerResponse) => Promise<void>;
 
@@ -180,7 +182,9 @@ export function createApp(deps: AppDeps): Handler {
       case '/favicon.ico':
         return redirect(res, '/static/favicon.svg');
       case '/robots.txt':
-        return send(res, 200, ROBOTS, 'text/plain; charset=utf-8', { 'Cache-Control': 'public, max-age=86400' });
+        return send(res, 200, config.beta ? ROBOTS_BETA : ROBOTS, 'text/plain; charset=utf-8', {
+          'Cache-Control': 'public, max-age=3600',
+        });
       case '/healthz':
         return send(res, 200, 'ok\n', 'text/plain; charset=utf-8');
     }
@@ -197,6 +201,7 @@ export function createApp(deps: AppDeps): Handler {
 
   // HEAD is answered like GET; Node itself leaves the body out.
   return async (req, res) => {
+    if (config.beta) res.setHeader('X-Robots-Tag', 'noindex, nofollow');
     try {
       await route(req, res);
     } catch (err) {

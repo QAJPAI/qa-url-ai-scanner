@@ -149,3 +149,25 @@ pre.copy {
 .finding dd { margin: 0; overflow-wrap: anywhere; }
 table.coverage { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
 table.coverage th, table.coverage td { text-align: left; padding: 0.4rem 0.5rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+.beta-notice {
+  margin: 0;
+  padding: 0.45rem 1.25rem;
+  background: #fff4d6;
+  color: #5c4100;
+  font-size: 0.85rem;
+  text-align: center;
+  border-bottom: 1px solid #f0d78c;
+}
+@media (prefers-color-scheme: dark) {
+  .beta-notice { background: #3a2f0f; color: #f5dfa0; border-color: #5c4a14; }
+}
+.brand .beta {
+  display: inline-block;
+  margin-left: 0.3rem;
+  padding: 0 0.4rem;
+  border-radius: 0.3rem;
+  font-size: 0.8rem;
+  vertical-align: 0.15rem;
+  background: var(--c);
+  color: #fff;
+}

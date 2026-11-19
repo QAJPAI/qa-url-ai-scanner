@@ -28,6 +28,8 @@ module.exports = {
         MAIL_FROM: 'url.jp.ai <noreply@url.jp.ai>',
         // 'off' stops active checks for owners at once.
         ACTIVE_CHECKS: 'on',
+        // Beta (test operation): a notice on every page, no search indexing. 'off' when it ends.
+        SITE_BETA: 'on',
       },
     },
   ],

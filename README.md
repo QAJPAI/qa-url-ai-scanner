@@ -77,6 +77,7 @@ MONGODB_URI=mongodb://127.0.0.1:27017 npm test
 | `SESSION_SECRET` | random per start in development; **required** (32+ characters) in production. Changing it signs every owner out. Make one with `openssl rand -base64 48`. |
 | `RESEND_API_KEY`, `MAIL_FROM` | none (development: links go to the log; production: email method unavailable), `url.jp.ai <noreply@url.jp.ai>` |
 | `ACTIVE_CHECKS` | `on` |
+| `SITE_BETA` | `off` (`on`: a β notice on every page, `noindex` everywhere, robots.txt disallows all) |
 | `MAIL_PER_ADDRESS_PER_DAY`, `MAIL_PER_SITE_PER_DAY`, `MAIL_PER_IP_PER_DAY`, `MAIL_TOTAL_PER_DAY` | 3, 10, 10, 90 |
 | `VERIFY_PER_IP_PER_MINUTE`, `OWNER_CHECKS_PER_HOUR`, `LOGIN_LINK_MINUTES` | 5, 10, 15 |
 | `HOST`, `PORT` | `127.0.0.1`, `3000` |

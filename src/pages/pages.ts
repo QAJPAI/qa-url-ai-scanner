@@ -30,12 +30,13 @@ export function layout(ctx: PageContext, title: string, body: Html, options: { n
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${title === site.name ? `${site.name} — ${site.tagline}` : `${title} — ${site.name}`}</title>
 <meta name="description" content="${site.description}">
-${options.noindex ? html`<meta name="robots" content="noindex, nofollow">` : ''}
+${options.noindex || config.beta ? html`<meta name="robots" content="noindex, nofollow">` : ''}
 <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/static/site.css">
 </head>
 <body>
-<header class="top"><a class="brand" href="/">${site.name}</a><span class="tagline">${site.tagline}</span></header>
+${config.beta ? html`<p class="beta-notice" role="note">${site.betaNotice}</p>` : ''}
+<header class="top"><a class="brand" href="/">${site.name}${config.beta ? html`<span class="beta">${site.betaBadge}</span>` : ''}</a><span class="tagline">${site.tagline}</span></header>
 <main>
 ${body}
 </main>

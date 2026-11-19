@@ -48,5 +48,7 @@ export const site = {
   footerTerms: '利用規約',
   footerPrivacy: 'プライバシーポリシー',
   footerAbout: 'url.jp.ai について',
+  betaBadge: 'β',
+  betaNotice: 'β版（テスト運用中）です。判定の正確さを検証しています。結果は参考としてご覧ください。',
   footerVersion: (site: string, engine: string, rules: string) => `url.jp.ai v${site} ・ エンジン v${engine} ・ 検査ルール v${rules}`,
 };
