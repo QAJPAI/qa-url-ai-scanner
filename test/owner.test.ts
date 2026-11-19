@@ -100,7 +100,7 @@ test('email: link, confirm button, session, check, detailed result', async () =>
   assert.match(body, /検査した範囲（全 15 項目のうち 2 項目）についての評価です/);
   assert.equal(body.includes('<img src=x'), false, 'evidence is escaped');
   // The fake result ran no active check, so the page must not claim one.
-  assert.match(body, /実施した検査: 通常のページ表示と同等のアクセスのみ/);
+  assert.match(body, /実施した検査: 通常のページ表示と同等のアクセスと、DNS に公開されている情報（メールの送信ドメイン認証）の確認のみ/);
 
   assert.deepEqual(
     app.store.auditLog.map((e) => `${e.action}:${e.outcome}`),
