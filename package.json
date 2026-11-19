@@ -1,0 +1,36 @@
+{
+  "name": "qa-url-ai-scanner",
+  "version": "0.1.0",
+  "private": true,
+  "description": "url.jp.ai: a free check of a website's security, with details only for verified owners. Built on the QA.JP.AI engine.",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "start": "node dist/server.mjs",
+    "dev": "tsx src/server.ts",
+    "test": "node --import tsx --test test/*.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "license": "AGPL-3.0-or-later",
+  "author": "iQi <iqi@email.jp.ai>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/QAJPAI/qa-url-ai-scanner.git"
+  },
+  "bugs": {
+    "email": "qa@email.jp.ai"
+  },
+  "dependencies": {
+    "mongodb": "^6.22.0",
+    "qa-jp-ai-scanner": "file:../qa-jp-ai-scanner"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "esbuild": "^0.28.2",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
+  }
+}

@@ -1,0 +1,114 @@
+/* url.jp.ai — Copyright (C) 2026 iQi — AGPL-3.0-or-later */
+:root {
+  --ink: #1b1f24;
+  --muted: #5b6470;
+  --line: #d9dee4;
+  --paper: #ffffff;
+  --soft: #f4f6f8;
+  --accent: #0b5cad;
+  --on-accent: #ffffff;
+  --a: #1a7f37;
+  --b: #4d7c0f;
+  --c: #9a6700;
+  --d: #bc4c00;
+  --e: #cf222e;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ink: #e6e9ed;
+    --muted: #a2abb6;
+    --line: #353b43;
+    --paper: #15181c;
+    --soft: #1d2127;
+    --accent: #6cb6ff;
+    --on-accent: #0b1220;
+  }
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  color: var(--ink);
+  background: var(--paper);
+  font-family: system-ui, -apple-system, "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Yu Gothic UI", Meiryo, sans-serif;
+  line-height: 1.75;
+}
+a { color: var(--accent); }
+.top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 1rem;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--line);
+}
+.brand { font-weight: 700; font-size: 1.25rem; color: var(--ink); text-decoration: none; letter-spacing: 0.02em; }
+.tagline { color: var(--muted); font-size: 0.9rem; }
+main { max-width: 46rem; margin: 0 auto; padding: 1.5rem 1.25rem 3rem; }
+h1 { font-size: 1.6rem; line-height: 1.4; margin: 0.5rem 0 1rem; }
+h2 { font-size: 1.15rem; margin: 0 0 0.5rem; }
+.hero p { color: var(--muted); }
+.check { margin: 1.5rem 0 0; }
+.check label { display: block; font-weight: 600; margin-bottom: 0.4rem; }
+.check .row { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.check input {
+  flex: 1 1 16rem;
+  min-width: 0;
+  font: inherit;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  background: var(--paper);
+  color: var(--ink);
+}
+.check input:focus { outline: 3px solid color-mix(in srgb, var(--accent) 35%, transparent); border-color: var(--accent); }
+.check button {
+  font: inherit;
+  font-weight: 600;
+  padding: 0.7rem 1.4rem;
+  border: 0;
+  border-radius: 0.5rem;
+  background: var(--accent);
+  color: var(--on-accent);
+  cursor: pointer;
+}
+.note { color: var(--muted); font-size: 0.85rem; }
+.box {
+  margin: 1.5rem 0;
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+  background: var(--soft);
+}
+.box ul { margin: 0; padding-left: 1.25rem; }
+.box p:last-child { margin-bottom: 0; }
+.meta { display: grid; grid-template-columns: max-content 1fr; gap: 0.25rem 1rem; margin: 0 0 1.25rem; }
+.meta dt { color: var(--muted); }
+.meta dd { margin: 0; overflow-wrap: anywhere; }
+.grade { display: flex; align-items: center; gap: 1rem; margin: 0.25rem 0 1rem; }
+.kicker { margin: 1rem 0 0; font-weight: 600; }
+.kicker small { display: block; font-weight: 400; color: var(--muted); font-size: 0.85rem; }
+.grade .letter {
+  display: inline-grid;
+  place-items: center;
+  width: 4.5rem;
+  height: 4.5rem;
+  border-radius: 50%;
+  font-size: 2.2rem;
+  font-weight: 700;
+  color: #fff;
+  flex: none;
+}
+.grade-A .letter { background: var(--a); }
+.grade-B .letter { background: var(--b); }
+.grade-C .letter { background: var(--c); }
+.grade-D .letter { background: var(--d); }
+.grade-E .letter { background: var(--e); }
+.grade .label { font-weight: 600; }
+.facts { padding-left: 1.25rem; }
+.warn { color: var(--e); font-weight: 600; }
+.gated { border-left: 4px solid var(--accent); }
+.doc h2 { margin-top: 1.75rem; }
+footer { border-top: 1px solid var(--line); padding: 1.25rem; text-align: center; }
+footer nav { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.25rem 1.25rem; font-size: 0.9rem; }
+footer .version { color: var(--muted); font-size: 0.8rem; margin: 0.75rem 0 0; }
