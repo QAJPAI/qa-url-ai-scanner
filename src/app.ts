@@ -7,6 +7,7 @@ import type { Config } from './config';
 import { SECURITY_HEADERS, redirect, send } from './http/headers';
 import { BodyTooLargeError, clientIp, isSameOrigin, readForm } from './http/request';
 import { BusyError, ConcurrencyLimiter } from './limiter';
+import { createOwnerRoutes, type OwnerDeps } from './owner';
 import { aboutPage, homePage, messagePage, privacyPage, resultPage, termsPage } from './pages/pages';
 import { site } from './pages/text';
 import type { AuditOutcome, Store } from './store/types';
@@ -18,6 +19,7 @@ export interface AppDeps {
   config: Config;
   store: Store;
   scanPublic: PublicScan;
+  owner: OwnerDeps;
   stylesheet: string;
   favicon: string;
   now?: () => Date;
@@ -38,8 +40,10 @@ export function createApp(deps: AppDeps): Handler {
   const now = deps.now ?? (() => new Date());
   const newId = deps.newId ?? (() => randomBytes(16).toString('base64url'));
   const logError = deps.logError ?? ((message, err) => console.error(message, err));
+  // One limit for all checks, public and owner: the server's capacity is shared.
   const limiter = new ConcurrencyLimiter(config.limits.maxConcurrent, config.limits.maxQueued);
   const ctx = { config };
+  const ownerRoute = createOwnerRoutes({ config, store, deps: deps.owner, limiter, now, newId, logError });
 
   const audit = async (ip: string, outcome: AuditOutcome, target?: string, resultId?: string) => {
     const at = now();
@@ -148,6 +152,8 @@ export function createApp(deps: AppDeps): Handler {
     const method = req.method ?? 'GET';
     const isGet = method === 'GET' || method === 'HEAD';
 
+    if ((path === '/owner' || path.startsWith('/owner/')) && (await ownerRoute(req, res, path))) return;
+
     if (path === '/check') {
       if (method === 'POST') return check(req, res);
       return send(res, 405, messagePage(ctx, site.errorHeading, site.methodNotAllowed), undefined, { Allow: 'POST' });
@@ -183,7 +189,7 @@ export function createApp(deps: AppDeps): Handler {
       const id = path.slice(3);
       const result = RESULT_ID.test(id) ? await store.getResult(id, now()) : null;
       if (!result) return send(res, 404, messagePage(ctx, site.resultHeading, site.resultNotFound));
-      return send(res, 200, resultPage(ctx, result.summary), undefined, { 'X-Robots-Tag': 'noindex, nofollow' });
+      return send(res, 200, resultPage(ctx, result.summary, result.target), undefined, { 'X-Robots-Tag': 'noindex, nofollow' });
     }
 
     return send(res, 404, messagePage(ctx, site.errorHeading, site.notFound));

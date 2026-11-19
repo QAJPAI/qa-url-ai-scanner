@@ -19,3 +19,14 @@ only. Seen in a browser, it said "safe".
 
 - Rule: look at every page that shows a verdict, and label what the verdict
   covers next to it, in the same place.
+
+## Tests that set headers by hand cannot see what browsers do
+
+2026-11-20: every form was refused in a real browser, while all tests passed.
+`Referrer-Policy: no-referrer` makes browsers send `Origin: null` on form
+posts; the tests set `Origin` themselves.
+
+- Rule: walk every form in a real browser before calling a page done, and turn
+  what the browser actually sent into a test.
+- Rule: a security header can change how other security checks see requests.
+  When changing one, test the flows it touches, not only the header.

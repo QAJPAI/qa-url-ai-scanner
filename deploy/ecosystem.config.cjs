@@ -21,6 +21,13 @@ module.exports = {
         MONGODB_DB: 'url_jp_ai',
         OPERATOR_NAME: 'Agentic AI LLC', // the operator named in the terms and privacy policy
         CONTACT_EMAIL: 'qa@email.jp.ai',
+        // CHANGE: 32+ random characters, e.g. `openssl rand -base64 48`. Keep it out of git.
+        SESSION_SECRET: '',
+        // CHANGE: from resend.com after verifying the url.jp.ai domain (SPF and DKIM).
+        RESEND_API_KEY: '',
+        MAIL_FROM: 'url.jp.ai <noreply@url.jp.ai>',
+        // 'off' stops active checks for owners at once.
+        ACTIVE_CHECKS: 'on',
       },
     },
   ],

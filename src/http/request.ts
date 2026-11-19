@@ -27,7 +27,9 @@ export function clientIp(req: IncomingMessage, trustProxy: boolean): string {
  */
 export function isSameOrigin(req: IncomingMessage, baseUrl: URL): boolean {
   const origin = req.headers.origin;
-  if (origin !== undefined) return origin === baseUrl.origin;
+  // "null" is sent for privacy reasons as well as by sandboxed frames; then
+  // the browser's own Sec-Fetch-Site decides, which a page cannot set.
+  if (origin !== undefined && origin !== 'null') return origin === baseUrl.origin;
   return req.headers['sec-fetch-site'] === 'same-origin';
 }
 

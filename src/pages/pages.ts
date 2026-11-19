@@ -21,7 +21,7 @@ export interface PageContext {
   config: Config;
 }
 
-function layout(ctx: PageContext, title: string, body: Html, options: { noindex?: boolean } = {}): string {
+export function layout(ctx: PageContext, title: string, body: Html, options: { noindex?: boolean } = {}): string {
   const { config } = ctx;
   return html`<!DOCTYPE html>
 <html lang="ja">
@@ -66,7 +66,7 @@ function checkForm(value = ''): Html {
 </form>`;
 }
 
-function preReleaseBox(ctx: PageContext): Html {
+export function preReleaseBox(ctx: PageContext): Html {
   return html`<section class="box prerelease">
 <h2>${site.preReleaseHeading}</h2>
 <p>${site.preReleaseText}</p>
@@ -100,7 +100,7 @@ ${preReleaseBox(ctx)}`,
  * field that could carry anything about owner-only rules, and the sentence
  * about serious problems is the same for every site.
  */
-export function resultPage(ctx: PageContext, summary: PublicSummary): string {
+export function resultPage(ctx: PageContext, summary: PublicSummary, target: string): string {
   const grade = summary.grade;
   return layout(
     ctx,
@@ -126,7 +126,7 @@ ${summary.coverage.error > 0 ? html`<li class="warn">${t.incomplete(summary.cove
 <h2>${site.ownerHeading}</h2>
 <p>${t.seriousGated}</p>
 <p>${t.sameForEverySite}</p>
-<p>${site.ownerPending}</p>
+<p><a class="button" href="/owner?u=${encodeURIComponent(target)}">${site.ownerLink}</a></p>
 </div>
 <p class="note">${t.disclaimer}</p>
 <p class="note">${t.rulesVersion}: v${summary.rulesVersion}</p>
@@ -192,7 +192,9 @@ export function termsPage(ctx: PageContext): string {
 <li>プログラム等を用いて大量の検査を行うなど、本サービスまたは検査先のサイトに過大な負荷をかけること。</li>
 <li>本サービスの運営を妨げること。</li>
 </ol>
-<h2>第3条（検査結果）</h2>
+<h2>第3条（所有者向けの検査）</h2>
+<p>サイトの所有者であることを確認できた方には、詳しい検査結果を表示します。所有者向けの検査では、公開されていてはいけないファイルが公開されていないかを、数回のアクセスで確かめることがあります。利用者は、自らが所有するサイト、または検査について権限を持つ者から許可を得たサイトについてのみ、所有者の確認を行うものとします。他人になりすまして確認を行ってはなりません。</p>
+<h2>第3条の2（検査結果）</h2>
 <p>検査結果は、検査した時点で、検査した範囲について得られた評価です。サイトの安全性を保証するものではありません。検査していない項目があることは、結果の画面に表示します。</p>
 <h2>第4条（回数の制限）</h2>
 <p>運営者は、本サービスを安定して提供するため、検査の回数や同時に実行する検査の数を制限することがあります。</p>
@@ -223,17 +225,22 @@ export function privacyPage(ctx: PageContext): string {
 <ul>
 <li>入力された URL と、その検査結果（評価と件数）</li>
 <li>検査を依頼した方の IP アドレスと、依頼した日時</li>
+<li>所有者の確認にメールアドレスを使った場合は、そのメールアドレス</li>
+<li>所有者向けの詳しい検査結果（問題の場所と内容）</li>
 </ul>
-<p>検査したページの内容そのものは保存しません。アカウント登録はなく、Cookie も使用していません。アクセス解析や広告のためのサービスも使用していません。</p>
+<p>検査したページの内容そのものは保存しません。アカウント登録はありません。アクセス解析や広告のためのサービスは使用していません。</p>
+<h2>Cookie</h2>
+<p>Cookie は、所有者の確認を行う方にだけ使用します。確認の途中で使う識別子（最長 7 日間）と、確認できた状態を保つための識別子（最長 24 時間）の 2 つで、どちらも確認以外の目的には使いません。簡易チェックだけを利用する方には Cookie を使用しません。</p>
 <h2>2. 利用目的</h2>
 <ul>
 <li>本サービスを提供するため（検査結果のページを表示するため）</li>
 <li>回数の制限を行い、不正な利用を防止・調査するため</li>
+<li>所有者の確認のため（確認メールの送信を含みます）</li>
 </ul>
 <h2>3. 保存期間</h2>
-<p>検査結果は ${resultDays} 日間、IP アドレスと日時の記録は ${days} 日間保存し、その後自動的に削除します。</p>
+<p>検査結果は ${resultDays} 日間、IP アドレス・日時・確認に使ったメールアドレスの記録は ${days} 日間保存し、その後自動的に削除します。所有者向けの詳しい検査結果は、確認の有効期限（最長 24 時間）が過ぎると自動的に削除します。</p>
 <h2>4. 第三者への提供</h2>
-<p>法令に基づく場合を除き、取得した情報を第三者に提供しません。</p>
+<p>法令に基づく場合を除き、取得した情報を第三者に提供しません。確認メールの送信は、メール送信サービス（Resend）に委託しています。委託先には、送信に必要な範囲（宛先のメールアドレスとメールの内容）だけを渡します。</p>
 <h2>5. 検査結果のページ</h2>
 <p>検査結果のページは、推測できない URL で表示します。検索エンジンには登録されないよう設定しています。ただし、その URL を知った人は誰でも閲覧できます。表示されるのは基本設定の評価だけです。</p>
 <h2>6. お問い合わせ</h2>

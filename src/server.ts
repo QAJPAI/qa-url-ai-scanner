@@ -2,9 +2,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
-import { closeAgents, scanPublic } from 'qa-jp-ai-scanner';
+import { closeAgents, scanOwner, scanPublic, verifyByDns, verifyByFile } from 'qa-jp-ai-scanner';
 import { createApp } from './app';
 import { loadConfig } from './config';
+import { LogMailer, type Mailer, ResendMailer } from './mail';
 import { MemoryStore } from './store/memory';
 import { MongoStore } from './store/mongo';
 import type { Store } from './store/types';
@@ -23,6 +24,16 @@ if (config.mongoUri) {
   store = new MemoryStore();
 }
 
+let mailer: Mailer | undefined;
+if (config.mail.resendApiKey) mailer = new ResendMailer(config.mail.resendApiKey, config.mail.from);
+else if (!config.production) {
+  console.warn('RESEND_API_KEY is not set: sign-in emails are written to this log instead');
+  mailer = new LogMailer();
+} else {
+  console.warn('RESEND_API_KEY is not set: email verification is unavailable (file and DNS still work)');
+}
+if (!config.activeChecks) console.warn('ACTIVE_CHECKS=off: owners get passive checks only');
+
 const stylesheet = readFileSync(new URL('../static/site.css', import.meta.url), 'utf8');
 const favicon = readFileSync(new URL('../static/favicon.svg', import.meta.url), 'utf8');
 const handler = createApp({
@@ -31,6 +42,12 @@ const handler = createApp({
   stylesheet,
   favicon,
   scanPublic: (url, options) => scanPublic(url, options),
+  owner: {
+    verifyFile: (origin, token) => verifyByFile(origin, token),
+    verifyDns: (host, token) => verifyByDns(host, token),
+    scanOwner: (url, proof, options) => scanOwner(url, proof, options),
+    mailer,
+  },
 });
 
 const server = createServer((req, res) => void handler(req, res));

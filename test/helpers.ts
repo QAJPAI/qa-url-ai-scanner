@@ -2,8 +2,21 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import type { PublicSummary } from 'qa-jp-ai-scanner';
+import {
+  type Assessment,
+  ASSESSMENT_SCHEMA,
+  buildLedger,
+  ENGINE_VERSION,
+  proofCovers,
+  type PublicSummary,
+  recordFactory,
+  RULES_VERSION,
+  verifyByDns,
+  verifyByFile,
+} from 'qa-jp-ai-scanner';
 import { type AppDeps, createApp, type PublicScan } from '../src/app';
+import type { Mail } from '../src/mail';
+import type { OwnerDeps } from '../src/owner';
 import { type Config, loadConfig } from '../src/config';
 import { MemoryStore } from '../src/store/memory';
 
@@ -20,6 +33,40 @@ export function summaryFor(host: string, over: Partial<PublicSummary> = {}): Pub
   };
 }
 
+/** A detailed owner result as the engine would produce it, with hostile text in it. */
+export function ownerAssessment(host: string, startedAt = '2026-11-20T03:00:00.000Z'): Assessment {
+  const make = recordFactory('test.checker', 'url', 'passive');
+  return {
+    schema: ASSESSMENT_SCHEMA,
+    engineVersion: ENGINE_VERSION,
+    rulesVersion: RULES_VERSION,
+    target: { layer: 'url', host },
+    tier: 'owner',
+    startedAt,
+    records: [
+      make.confirmed({
+        ruleId: 'R02',
+        code: 'secret.openai',
+        key: 'k1',
+        location: `https://${host}/assets/app.js`,
+        evidence: 'sk-pr…（値は記録していません）<img src=x onerror=alert(1)>',
+        severity: 'P0',
+      }),
+      make.needsValidation({
+        ruleId: 'R01',
+        code: 'baas.supabase_rls_unverified',
+        key: 'k2',
+        location: `https://${host}/`,
+        evidence: 'Supabase',
+        blocker: 'requires_owner_intent',
+      }),
+    ],
+    coverage: buildLedger('url', [
+      { checker: 'test.checker', mode: 'passive', reports: [{ ruleId: 'R02', status: 'checked' }, { ruleId: 'R01', status: 'partial', note: 'presence_hint_only' }] },
+    ]),
+  };
+}
+
 export interface TestApp {
   base: string;
   store: MemoryStore;
@@ -27,8 +74,14 @@ export interface TestApp {
   scans: string[];
   errors: Array<{ message: string; err: unknown }>;
   clock: { now: Date };
+  mails: Mail[];
+  dns: Map<string, string[][]>;
+  ownerScans: Array<{ url: string; activeChecks: boolean }>;
   close(): Promise<void>;
   post(body: Record<string, string>, headers?: Record<string, string>): Promise<Response>;
+  /** POST a form to any path, as a browser on our own page would. */
+  form(path: string, body: Record<string, string>, cookie?: string, headers?: Record<string, string>): Promise<Response>;
+  get(path: string, cookie?: string): Promise<Response>;
 }
 
 export async function startApp(
@@ -36,6 +89,8 @@ export async function startApp(
     env?: Record<string, string>;
     scan?: PublicScan;
     configure?: (c: Config) => void;
+    owner?: Partial<OwnerDeps>;
+    noMailer?: boolean;
   } = {},
 ): Promise<TestApp> {
   const store = new MemoryStore();
@@ -47,12 +102,36 @@ export async function startApp(
   const config = loadConfig({ BASE_URL: 'http://localhost:3000', ...options.env });
   options.configure?.(config);
 
+  const mails: Mail[] = [];
+  const dns = new Map<string, string[][]>();
+  const ownerScans: TestApp['ownerScans'] = [];
+  const owner: OwnerDeps = {
+    // The engine's own verification; only the network side is replaced.
+    verifyFile: (origin, token) => verifyByFile(origin, token, { allowPrivate: true }),
+    verifyDns: (host, token) =>
+      verifyByDns(host, token, async (name) => {
+        const found = dns.get(name);
+        if (!found) throw Object.assign(new Error('not found'), { code: 'ENOTFOUND' });
+        return found;
+      }),
+    scanOwner: async (url, proof, o) => {
+      const host = new URL(url).hostname;
+      // As the engine does: the proof must cover the site.
+      if (!proofCovers(proof, host)) throw new Error('proof does not cover');
+      ownerScans.push({ url, activeChecks: o.activeChecks });
+      return ownerAssessment(host);
+    },
+    mailer: options.noMailer ? undefined : { send: async (m) => void mails.push(m) },
+    ...options.owner,
+  };
+
   let counter = 0;
   const deps: AppDeps = {
     config,
     store,
     stylesheet: 'body{}',
     favicon: '<svg/>',
+    owner,
     now: () => clock.now,
     newId: () => `id${String(++counter).padStart(20, '0')}`,
     logError: (message, err) => errors.push({ message, err }),
@@ -84,6 +163,9 @@ export async function startApp(
     scans,
     errors,
     clock,
+    mails,
+    dns,
+    ownerScans,
     close: () => new Promise<void>((resolve) => server.close(() => resolve())),
     post: (body, headers = { Origin: config.baseUrl.origin }) =>
       fetch(`${base}/check`, {
@@ -92,5 +174,21 @@ export async function startApp(
         body: new URLSearchParams(body).toString(),
         redirect: 'manual',
       }),
+    form: (path, body, cookie, headers = {}) =>
+      fetch(`${base}${path}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          Origin: config.baseUrl.origin,
+          ...(cookie ? { Cookie: cookie } : {}),
+          ...headers,
+        },
+        body: new URLSearchParams(body).toString(),
+        redirect: 'manual',
+      }),
+    get: (path, cookie) => fetch(`${base}${path}`, { headers: cookie ? { Cookie: cookie } : {}, redirect: 'manual' }),
   };
 }
+
+/** The name=value part of a Set-Cookie header. */
+export const cookieOf = (r: Response): string => (r.headers.get('set-cookie') ?? '').split(';')[0]!;

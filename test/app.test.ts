@@ -30,7 +30,7 @@ test('pages carry the security headers and no script', async () => {
     assert.match(r.headers.get('content-security-policy')!, /default-src 'none'/);
     assert.match(r.headers.get('content-security-policy')!, /frame-ancestors 'none'/);
     assert.equal(r.headers.get('x-content-type-options'), 'nosniff');
-    assert.equal(r.headers.get('referrer-policy'), 'no-referrer');
+    assert.equal(r.headers.get('referrer-policy'), 'same-origin');
     const body = await text(r);
     assert.equal(/<script/i.test(body), false, `${path} has no script`);
     assert.match(body, /<html lang="ja">/);
@@ -67,8 +67,11 @@ test('a check started from another site is refused before anything runs', async 
   }
   assert.deepEqual(app.scans, []);
   assert.ok(app.store.auditLog.every((e) => e.outcome === 'refused_origin'));
-  // A same-origin form post without Origin is still accepted.
+  // A same-origin form post without Origin, or with "Origin: null", is decided by Sec-Fetch-Site.
   assert.equal((await app.post({ url: 'example.jp' }, { 'Sec-Fetch-Site': 'same-origin' })).status, 303);
+  assert.equal((await app.post({ url: 'b.example.jp' }, { Origin: 'null', 'Sec-Fetch-Site': 'same-origin' })).status, 303);
+  assert.equal((await app.post({ url: 'c.example.jp' }, { Origin: 'null', 'Sec-Fetch-Site': 'cross-site' })).status, 403);
+  assert.equal((await app.post({ url: 'd.example.jp' }, { Origin: 'null' })).status, 403);
 });
 
 test('bad input is refused without a check', async () => {
@@ -293,7 +296,8 @@ test('the audit log keeps who, what, outcome, and an expiry', async () => {
 test('the privacy policy states the retention actually configured', async () => {
   const app = await start({ env: { AUDIT_TTL_DAYS: '14', RESULT_TTL_DAYS: '7', OPERATOR_NAME: 'テスト運営' } });
   const body = await text(await fetch(app.base + '/privacy'));
-  assert.match(body, /検査結果は 7 日間、IP アドレスと日時の記録は 14 日間保存/);
+  assert.match(body, /検査結果は 7 日間、IP アドレス・日時・確認に使ったメールアドレスの記録は 14 日間保存/);
+  assert.match(body, /Resend/);
   assert.match(body, /テスト運営/);
 });
 

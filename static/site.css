@@ -112,3 +112,40 @@ h2 { font-size: 1.15rem; margin: 0 0 0.5rem; }
 footer { border-top: 1px solid var(--line); padding: 1.25rem; text-align: center; }
 footer nav { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.25rem 1.25rem; font-size: 0.9rem; }
 footer .version { color: var(--muted); font-size: 0.8rem; margin: 0.75rem 0 0; }
+a.button, button.secondary {
+  display: inline-block;
+  font: inherit;
+  font-weight: 600;
+  padding: 0.6rem 1.2rem;
+  border-radius: 0.5rem;
+  text-decoration: none;
+  cursor: pointer;
+}
+a.button { background: var(--accent); color: var(--on-accent); }
+button.secondary { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
+form > button[type="submit"]:not(.secondary) {
+  font: inherit; font-weight: 600; padding: 0.7rem 1.4rem; border: 0; border-radius: 0.5rem;
+  background: var(--accent); color: var(--on-accent); cursor: pointer;
+}
+pre.copy {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  padding: 0.75rem 1rem;
+  font-size: 0.85rem;
+  user-select: all;
+}
+.signout { margin: 1.5rem 0; }
+.findings { padding-left: 1.25rem; }
+.finding { margin: 0 0 1.25rem; }
+.finding .title { font-weight: 600; margin: 0 0 0.25rem; }
+.finding .sev { display: inline-block; font-size: 0.8rem; padding: 0 0.5rem; border-radius: 0.25rem; color: #fff; background: var(--c); }
+.sev-P0 .sev { background: var(--e); }
+.sev-P1 .sev { background: var(--d); }
+.finding dl { display: grid; grid-template-columns: max-content 1fr; gap: 0.15rem 0.75rem; margin: 0; font-size: 0.92rem; }
+.finding dt { color: var(--muted); }
+.finding dd { margin: 0; overflow-wrap: anywhere; }
+table.coverage { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+table.coverage th, table.coverage td { text-align: left; padding: 0.4rem 0.5rem; border-bottom: 1px solid var(--line); vertical-align: top; }

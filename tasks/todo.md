@@ -65,20 +65,26 @@ Still open for step 1:
 
 ## Step 2: owner results
 
-- [ ] Ownership methods A / B / C, as the engine already decides them:
+- [x] Ownership methods A / B / C, as the engine already decides them:
       same-domain email with a sign-in link (main); a verification file placed by
       the owner's AI; DNS TXT.
-- [ ] Owner session: HttpOnly / Secure / SameSite cookie, 24 hours, one host.
-- [ ] Owner report at `/owner/<id>`: the engine re-checks the proof when it
-      renders the report.
-- [ ] Limits per email address; record who opened details and when.
-- [ ] Active checks (requesting `.env` and similar paths) run for verified
+- [x] Owner session: `__Host-` HttpOnly / Secure / SameSite=Lax cookie, at most 24 hours (the proof's life), engine-sealed proof stored server-side.
+- [x] Owner report at `/owner/r/<id>`: only for the session that ran it, while its proof still covers the site.
+- [x] Limits per email address, site, sender address and day; per-minute limits on file / DNS attempts; per-session limit on owner checks. The audit log records who verified (method, address) and who opened details, and when.
+- [x] Active checks (requesting `.env` and similar paths) run for verified
       owners from the start (iQi, 2026-11-20). What makes them acceptable is the
       owner's consent, proven by verification, and that they are a few ordinary
       requests for public paths. They sit behind a server switch
       (`ACTIVE_CHECKS=on|off`) so they can be turned off at once, every run is
       in the audit log, and the terms say: only sites you own or are
       authorised to check. Legal review is still to be done before wide use.
+
+Still open for step 2:
+- [ ] Resend: account, url.jp.ai domain verified (SPF, DKIM), `RESEND_API_KEY` on the server.
+- [ ] `SESSION_SECRET` on the server.
+- [ ] Decide whether to tell a domain's admin address when someone unlocks
+      details by email (the engine suggests it for large organisations).
+- [ ] Switch the engine dependency to `github:QAJPAI/qa-jp-ai-scanner#v0.9.0` once pushed.
 
 ## Step 3
 
@@ -109,3 +115,27 @@ Still open for step 1:
   fails within two seconds.
 - Not verified here: the MongoDB store against a real MongoDB (none in this
   environment; the download was blocked).
+
+## Review (2026-11-20, step 2)
+
+- 42 tests pass; type check clean; the repo passes QA.JP.AI's check.
+- Engine 0.9.0 added what a web service needs: sealed proofs (only the engine
+  creates and opens them; a changed sealed text, another secret or an expired
+  one opens nothing) and an off switch for active checks that the ledger reports.
+- Walked through in a real browser (Chromium): public check → owner start →
+  email → link → button → session → detailed result → sign-out, no console
+  errors, both cookies HttpOnly and SameSite=Lax. Active checks were off,
+  because this environment owns no site to probe.
+- That walk found a bug no test had: with `Referrer-Policy: no-referrer`,
+  browsers send `Origin: null` on our own form posts, so every form was refused
+  as cross-site — including the step-1 check form, already on GitHub. Fixed
+  (`same-origin`, and Sec-Fetch-Site decides when Origin is null), with tests.
+- Also from looking at the pages: the owner result claimed owner-only checks
+  had run when the switch was off; it now says what actually ran, and the
+  grade carries its scope.
+- Mutation check: 19 owner safeguards removed one at a time; four survived at
+  first. Tests were added for three (a second session for the same site, store
+  expiry, malformed owner result ids); one (cookie value format) changed
+  nothing and was removed.
+- Not verified here: sending through Resend (no key), the MongoDB store against
+  a real MongoDB, and active checks against a real site.

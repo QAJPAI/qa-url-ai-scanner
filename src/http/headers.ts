@@ -11,8 +11,10 @@ export const SECURITY_HEADERS: Record<string, string> = {
     "default-src 'none'; style-src 'self'; img-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
   'X-Content-Type-Options': 'nosniff',
   'X-Frame-Options': 'DENY',
-  // Result pages have unguessable addresses; never pass them on to linked sites.
-  'Referrer-Policy': 'no-referrer',
+  // Result pages have unguessable addresses; never pass them on to other sites.
+  // Not 'no-referrer': with it, browsers send "Origin: null" on our own form
+  // posts, and the same-origin check could no longer recognise them.
+  'Referrer-Policy': 'same-origin',
   'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), interest-cohort=()',
   'Cross-Origin-Opener-Policy': 'same-origin',
   'Cross-Origin-Resource-Policy': 'same-origin',

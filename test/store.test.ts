@@ -56,6 +56,30 @@ for (const [name, open, cleanUp] of stores) {
       assert.equal(await store.hit('other', 60_000, t0), 1, 'keys are separate');
 
       await store.audit({ at: t0, ip: '203.0.113.9', action: 'public_check', outcome: 'checked', expiresAt: later(1000) });
+
+      // Sign-in links: looked at freely, used once, never after they expire.
+      const token = { hash: 'h'.repeat(43), email: 'info@example.jp', target: 'https://example.jp/', createdAt: t0, expiresAt: later(60_000) };
+      await store.saveLoginToken(token);
+      assert.equal((await store.peekLoginToken(token.hash, t0))?.email, 'info@example.jp');
+      assert.equal((await store.peekLoginToken(token.hash, t0))?.email, 'info@example.jp', 'peeking does not use it');
+      assert.equal(await store.peekLoginToken(token.hash, later(60_000)), null, 'expired');
+      assert.equal((await store.takeLoginToken(token.hash, t0))?.target, 'https://example.jp/');
+      assert.equal(await store.takeLoginToken(token.hash, t0), null, 'once');
+      await store.saveLoginToken({ ...token, hash: 'g'.repeat(43) });
+      assert.equal(await store.takeLoginToken('g'.repeat(43), later(60_000)), null, 'expired');
+
+      // Sessions and owner results expire, even before the database removes them.
+      const session = { hash: 's'.repeat(43), sealed: 'qa1.x.y', target: 'https://example.jp/', method: 'email' as const, email: 'info@example.jp', createdAt: t0, expiresAt: later(60_000) };
+      await store.saveSession(session);
+      assert.equal((await store.getSession(session.hash, t0))?.sealed, 'qa1.x.y');
+      assert.equal(await store.getSession(session.hash, later(60_000)), null, 'expired');
+      await store.deleteSession(session.hash);
+      assert.equal(await store.getSession(session.hash, t0), null, 'deleted');
+
+      const owner = { id: 'o'.repeat(22), sessionHash: session.hash, assessment: { tier: 'owner' } as never, createdAt: t0, expiresAt: later(60_000) };
+      await store.saveOwnerResult(owner);
+      assert.equal((await store.getOwnerResult(owner.id, t0))?.sessionHash, session.hash);
+      assert.equal(await store.getOwnerResult(owner.id, later(60_000)), null, 'expired');
     } finally {
       await store.close();
       await cleanUp();
