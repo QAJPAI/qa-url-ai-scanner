@@ -30,3 +30,7 @@ posts; the tests set `Origin` themselves.
   what the browser actually sent into a test.
 - Rule: a security header can change how other security checks see requests.
   When changing one, test the flows it touches, not only the header.
+
+## Commands for the user start from a known place (2026-11-20)
+- I wrote "run `node dist/qa-scan.mjs`" while the user was in the other repo; it failed twice.
+- Rule: every command I hand over runs from anywhere — an absolute path (`node ~/Claude/QA/qa-jp-ai-scanner/dist/qa-scan.mjs …`) or a `cd` in the same line.
