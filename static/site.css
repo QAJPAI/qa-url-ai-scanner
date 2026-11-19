@@ -1,173 +1,147 @@
-/* url.jp.ai — Copyright (C) 2026 iQi — AGPL-3.0-or-later */
+/* url.jp.ai — Copyright (C) 2026 iQi — AGPL-3.0-or-later
+   Colours and type follow JP.AI: night by default, day when the device is in light mode. */
 :root {
-  --ink: #1b1f24;
-  --muted: #5b6470;
-  --line: #d9dee4;
-  --paper: #ffffff;
-  --soft: #f4f6f8;
-  --accent: #0b5cad;
-  --on-accent: #ffffff;
-  --a: #1a7f37;
-  --b: #4d7c0f;
-  --c: #9a6700;
-  --d: #bc4c00;
-  --e: #cf222e;
+  color-scheme: dark;
+  --bg: #090d20;
+  --surface: #0f142b;
+  --surface-2: #1a2140;
+  --ink: #f0f1f3;
+  --ink-2: #b4bcc8;
+  --ink-3: #8c97ab;
+  --line: #1f2644;
+  --line-2: #6b7794;
+  --accent: #a6b9ff;
+  --accent-hover: #c0cdff;
+  --on-accent: #111527;
+  --accent-soft: #1f2a4d;
+  --accent-text: #b7c8ff;
+  --gold: #ffda89;
+  --new-bg: #392e1d;
+  --new-fg: #ffda89;
+  --new-line: #5a4a26;
+  --a: #3fb950;
+  --b: #9bc53d;
+  --c: #e3b341;
+  --d: #f0883e;
+  --e: #f85149;
+  --font-body: system-ui, -apple-system, "Segoe UI", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", Meiryo, sans-serif;
+  --font-display: Georgia, "Times New Roman", "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
 }
-@media (prefers-color-scheme: dark) {
+@media (prefers-color-scheme: light) {
   :root {
-    --ink: #e6e9ed;
-    --muted: #a2abb6;
-    --line: #353b43;
-    --paper: #15181c;
-    --soft: #1d2127;
-    --accent: #6cb6ff;
-    --on-accent: #0b1220;
+    color-scheme: light;
+    --bg: #f5f5f2;
+    --surface: #ffffff;
+    --surface-2: #ebebe7;
+    --ink: #222730;
+    --ink-2: #565d68;
+    --ink-3: #626975;
+    --line: #d3d6db;
+    --line-2: #78818e;
+    --accent: #3451db;
+    --accent-hover: #2945c5;
+    --on-accent: #ffffff;
+    --accent-soft: #e5eafa;
+    --accent-text: #304bc1;
+    --gold: #805619;
+    --new-bg: #fbf3e2;
+    --new-fg: #805619;
+    --new-line: #e7d3a8;
+    --a: #1a7f37;
+    --b: #4d7c0f;
+    --c: #9a6700;
+    --d: #bc4c00;
+    --e: #cf222e;
   }
 }
 * { box-sizing: border-box; }
-html { -webkit-text-size-adjust: 100%; }
-body {
-  margin: 0;
-  color: var(--ink);
-  background: var(--paper);
-  font-family: system-ui, -apple-system, "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Yu Gothic UI", Meiryo, sans-serif;
-  line-height: 1.75;
-}
-a { color: var(--accent); }
-.top {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 0.25rem 1rem;
-  padding: 1rem 1.25rem;
-  border-bottom: 1px solid var(--line);
-}
-.brand { font-weight: 700; font-size: 1.25rem; color: var(--ink); text-decoration: none; letter-spacing: 0.02em; }
-.tagline { color: var(--muted); font-size: 0.9rem; }
-main { max-width: 46rem; margin: 0 auto; padding: 1.5rem 1.25rem 3rem; }
-h1 { font-size: 1.6rem; line-height: 1.4; margin: 0.5rem 0 1rem; }
-h2 { font-size: 1.15rem; margin: 0 0 0.5rem; }
-.hero p { color: var(--muted); }
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+body { margin: 0; color: var(--ink); background: var(--bg); font-family: var(--font-body); font-size: 15px; line-height: 1.8; }
+a { color: var(--accent-text); }
+a:hover { color: var(--accent-hover); }
+
+/* Header and logo, as JP.AI: the domain part in the accent colour. */
+.top { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.25rem 0.9rem; padding: 0.9rem 1.5rem; border-bottom: 1px solid var(--line); background: var(--bg); }
+.brand { color: var(--ink); text-decoration: none; display: inline-flex; align-items: baseline; }
+.logo-mark { font-family: var(--font-display); font-weight: 500; font-size: 1.6rem; letter-spacing: 0.01em; line-height: 1.2; }
+.logo-mark .tld { color: var(--accent-text); }
+.brand .beta { display: inline-block; margin-left: 0.45rem; padding: 0 0.45rem; border: 1px solid var(--new-line); border-radius: 4px; background: var(--new-bg); color: var(--new-fg); font-family: var(--font-body); font-size: 0.75rem; font-weight: 600; line-height: 1.6; vertical-align: 0.35rem; }
+.tagline { color: var(--ink-3); font-size: 0.82rem; }
+.beta-notice { margin: 0; padding: 0.45rem 1.25rem; background: var(--new-bg); color: var(--new-fg); border-bottom: 1px solid var(--new-line); font-size: 0.82rem; text-align: center; }
+
+main { max-width: 46rem; margin: 0 auto; padding: 2rem 1.5rem 3.5rem; }
+h1, h2 { font-family: var(--font-display); font-weight: 500; }
+h1 { font-size: 1.9rem; line-height: 1.35; letter-spacing: -0.01em; margin: 0.5rem 0 1rem; }
+h2 { font-size: 1.2rem; line-height: 1.45; margin: 0 0 0.5rem; }
+.hero p, .note { color: var(--ink-2); }
+.note { font-size: 0.85rem; }
+
+/* Forms and buttons. */
 .check { margin: 1.5rem 0 0; }
 .check label { display: block; font-weight: 600; margin-bottom: 0.4rem; }
 .check .row { display: flex; gap: 0.5rem; flex-wrap: wrap; }
 .check input {
-  flex: 1 1 16rem;
-  min-width: 0;
-  font: inherit;
-  padding: 0.7rem 0.8rem;
-  border: 1px solid var(--line);
-  border-radius: 0.5rem;
-  background: var(--paper);
-  color: var(--ink);
+  flex: 1 1 16rem; min-width: 0; font: inherit; padding: 0.7rem 0.85rem;
+  border: 1px solid var(--line-2); border-radius: 7px; background: var(--surface); color: var(--ink);
 }
-.check input:focus { outline: 3px solid color-mix(in srgb, var(--accent) 35%, transparent); border-color: var(--accent); }
-.check button {
-  font: inherit;
-  font-weight: 600;
-  padding: 0.7rem 1.4rem;
-  border: 0;
-  border-radius: 0.5rem;
-  background: var(--accent);
-  color: var(--on-accent);
-  cursor: pointer;
+.check input::placeholder { color: var(--ink-3); }
+.check input:focus { outline: 3px solid color-mix(in srgb, var(--accent) 40%, transparent); border-color: var(--accent); }
+button, a.button {
+  display: inline-block; font: inherit; font-weight: 600; padding: 0.65rem 1.35rem; border: 0; border-radius: 7px;
+  background: var(--accent); color: var(--on-accent); cursor: pointer; text-decoration: none;
 }
-.note { color: var(--muted); font-size: 0.85rem; }
-.box {
-  margin: 1.5rem 0;
-  padding: 1rem 1.25rem;
-  border: 1px solid var(--line);
-  border-radius: 0.75rem;
-  background: var(--soft);
-}
+button:hover, a.button:hover { background: var(--accent-hover); color: var(--on-accent); }
+button.secondary { background: transparent; color: var(--accent-text); border: 1px solid var(--line-2); }
+button.secondary:hover { background: var(--accent-soft); color: var(--accent-text); }
+
+/* Cards, as JP.AI: surface, thin line, small radius. */
+.box { margin: 1.5rem 0; padding: 1.1rem 1.3rem; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); }
 .box ul { margin: 0; padding-left: 1.25rem; }
 .box p:last-child { margin-bottom: 0; }
+.gated { border-left: 3px solid var(--accent); }
+
+/* Results. */
 .meta { display: grid; grid-template-columns: max-content 1fr; gap: 0.25rem 1rem; margin: 0 0 1.25rem; }
-.meta dt { color: var(--muted); }
+.meta dt { color: var(--ink-3); }
 .meta dd { margin: 0; overflow-wrap: anywhere; }
-.grade { display: flex; align-items: center; gap: 1rem; margin: 0.25rem 0 1rem; }
 .kicker { margin: 1rem 0 0; font-weight: 600; }
-.kicker small { display: block; font-weight: 400; color: var(--muted); font-size: 0.85rem; }
+.kicker small { display: block; font-weight: 400; color: var(--ink-3); font-size: 0.85rem; }
+.grade { display: flex; align-items: center; gap: 1rem; margin: 0.3rem 0 1rem; }
 .grade .letter {
-  display: inline-grid;
-  place-items: center;
-  width: 4.5rem;
-  height: 4.5rem;
-  border-radius: 50%;
-  font-size: 2.2rem;
-  font-weight: 700;
-  color: #fff;
-  flex: none;
+  display: inline-grid; place-items: center; width: 4.4rem; height: 4.4rem; border-radius: 50%; flex: none;
+  font-family: var(--font-display); font-size: 2.3rem; font-weight: 500; border: 3px solid currentColor; background: transparent;
 }
-.grade-A .letter { background: var(--a); }
-.grade-B .letter { background: var(--b); }
-.grade-C .letter { background: var(--c); }
-.grade-D .letter { background: var(--d); }
-.grade-E .letter { background: var(--e); }
+.grade-A .letter { color: var(--a); }
+.grade-B .letter { color: var(--b); }
+.grade-C .letter { color: var(--c); }
+.grade-D .letter { color: var(--d); }
+.grade-E .letter { color: var(--e); }
 .grade .label { font-weight: 600; }
-.facts { padding-left: 1.25rem; }
+.facts { padding-left: 1.25rem; color: var(--ink-2); }
 .warn { color: var(--e); font-weight: 600; }
-.gated { border-left: 4px solid var(--accent); }
-.doc h2 { margin-top: 1.75rem; }
-footer { border-top: 1px solid var(--line); padding: 1.25rem; text-align: center; }
-footer nav { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.25rem 1.25rem; font-size: 0.9rem; }
-footer .version { color: var(--muted); font-size: 0.8rem; margin: 0.75rem 0 0; }
-a.button, button.secondary {
-  display: inline-block;
-  font: inherit;
-  font-weight: 600;
-  padding: 0.6rem 1.2rem;
-  border-radius: 0.5rem;
-  text-decoration: none;
-  cursor: pointer;
-}
-a.button { background: var(--accent); color: var(--on-accent); }
-button.secondary { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
-form > button[type="submit"]:not(.secondary) {
-  font: inherit; font-weight: 600; padding: 0.7rem 1.4rem; border: 0; border-radius: 0.5rem;
-  background: var(--accent); color: var(--on-accent); cursor: pointer;
-}
+
+/* Owner pages. */
 pre.copy {
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  background: var(--paper);
-  border: 1px solid var(--line);
-  border-radius: 0.5rem;
-  padding: 0.75rem 1rem;
-  font-size: 0.85rem;
-  user-select: all;
+  white-space: pre-wrap; overflow-wrap: anywhere; background: var(--bg); border: 1px solid var(--line);
+  border-radius: 6px; padding: 0.8rem 1rem; font-size: 0.85rem; color: var(--ink-2); user-select: all;
 }
 .signout { margin: 1.5rem 0; }
 .findings { padding-left: 1.25rem; }
-.finding { margin: 0 0 1.25rem; }
-.finding .title { font-weight: 600; margin: 0 0 0.25rem; }
-.finding .sev { display: inline-block; font-size: 0.8rem; padding: 0 0.5rem; border-radius: 0.25rem; color: #fff; background: var(--c); }
-.sev-P0 .sev { background: var(--e); }
+.finding { margin: 0 0 1.4rem; }
+.finding .title { font-weight: 600; margin: 0 0 0.3rem; }
+.finding .sev { display: inline-block; font-size: 0.78rem; padding: 0 0.5rem; border-radius: 4px; color: var(--on-accent); background: var(--c); }
+.sev-P0 .sev { background: var(--e); color: #fff; }
 .sev-P1 .sev { background: var(--d); }
 .finding dl { display: grid; grid-template-columns: max-content 1fr; gap: 0.15rem 0.75rem; margin: 0; font-size: 0.92rem; }
-.finding dt { color: var(--muted); }
+.finding dt { color: var(--ink-3); }
 .finding dd { margin: 0; overflow-wrap: anywhere; }
 table.coverage { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
-table.coverage th, table.coverage td { text-align: left; padding: 0.4rem 0.5rem; border-bottom: 1px solid var(--line); vertical-align: top; }
-.beta-notice {
-  margin: 0;
-  padding: 0.45rem 1.25rem;
-  background: #fff4d6;
-  color: #5c4100;
-  font-size: 0.85rem;
-  text-align: center;
-  border-bottom: 1px solid #f0d78c;
-}
-@media (prefers-color-scheme: dark) {
-  .beta-notice { background: #3a2f0f; color: #f5dfa0; border-color: #5c4a14; }
-}
-.brand .beta {
-  display: inline-block;
-  margin-left: 0.3rem;
-  padding: 0 0.4rem;
-  border-radius: 0.3rem;
-  font-size: 0.8rem;
-  vertical-align: 0.15rem;
-  background: var(--c);
-  color: #fff;
-}
+table.coverage th, table.coverage td { text-align: left; padding: 0.45rem 0.5rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+table.coverage th { color: var(--ink-3); font-weight: 600; }
+.doc h2 { margin-top: 1.9rem; }
+.doc ol, .doc ul { padding-left: 1.4rem; }
+
+footer { border-top: 1px solid var(--line); padding: 1.4rem; text-align: center; }
+footer nav { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.25rem 1.25rem; font-size: 0.88rem; }
+footer nav a { color: var(--ink-2); }
+footer .version { color: var(--ink-3); font-size: 0.78rem; margin: 0.75rem 0 0; }

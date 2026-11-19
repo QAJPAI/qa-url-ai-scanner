@@ -36,7 +36,7 @@ ${options.noindex || config.beta ? html`<meta name="robots" content="noindex, no
 </head>
 <body>
 ${config.beta ? html`<p class="beta-notice" role="note">${site.betaNotice}</p>` : ''}
-<header class="top"><a class="brand" href="/">${site.name}${config.beta ? html`<span class="beta">${site.betaBadge}</span>` : ''}</a><span class="tagline">${site.tagline}</span></header>
+<header class="top"><a class="brand" href="/" aria-label="${site.name}"><span class="logo-mark">URL<span class="tld">.jp.ai</span></span>${config.beta ? html`<span class="beta">${site.betaBadge}</span>` : ''}</a><span class="tagline">${site.tagline}</span></header>
 <main>
 ${body}
 </main>
