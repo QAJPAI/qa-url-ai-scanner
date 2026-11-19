@@ -57,8 +57,8 @@ message per kind of failure; a magnifying-glass favicon (not a shield or a
 check mark, which would read as "certified").
 
 Still open for step 1:
-- [ ] Switch the engine dependency from `file:../qa-jp-ai-scanner` to
-      `github:QAJPAI/qa-jp-ai-scanner#v0.8.0` once that tag is pushed.
+- [x] Engine dependency: `github:QAJPAI/qa-jp-ai-scanner#v0.8.0` (2026-11-20).
+      A clean `npm ci` with SSH blocked installs and builds it over HTTPS.
 - [ ] Run the MongoDB store tests on the server (`MONGODB_URI=… npm test`).
 - [ ] Deploy behind nginx.
 - [x] Operator in the terms and privacy policy: Agentic AI LLC (iQi, 2026-11-20).
