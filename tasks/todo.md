@@ -60,7 +60,8 @@ Still open for step 1:
 - [x] Engine dependency: `github:QAJPAI/qa-jp-ai-scanner#v0.8.0` (2026-11-20).
       A clean `npm ci` with SSH blocked installs and builds it over HTTPS.
 - [ ] Run the MongoDB store tests on the server (`MONGODB_URI=… npm test`).
-- [ ] Deploy behind nginx.
+- [ ] Deploy behind nginx. Deploy from git with `scripts/deploy.sh`; secrets in
+      `~/.config/url-jp-ai/secrets.env`, not in the repository (2026-11-22).
 - [x] Operator in the terms and privacy policy: Agentic AI LLC (iQi, 2026-11-20).
 
 ## Step 2: owner results
@@ -85,6 +86,7 @@ Still open for step 2:
 - [x] Admin-address notice when details are unlocked by email: not for now;
       the audit log records it (iQi, 2026-11-20). Revisit after the test run.
 - [x] Engine dependency: `github:QAJPAI/qa-jp-ai-scanner#v0.9.0` (clean `npm ci` with SSH blocked: OK).
+- [x] Engine dependency: `v0.10.1` (2026-11-22).
 - [x] Beta switch `SITE_BETA=on` for the test run: β notice on every page, noindex everywhere, robots.txt disallows all.
 
 ## Step 3

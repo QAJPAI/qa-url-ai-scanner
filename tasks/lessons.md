@@ -34,3 +34,10 @@ posts; the tests set `Origin` themselves.
 ## Commands for the user start from a known place (2026-11-20)
 - I wrote "run `node dist/qa-scan.mjs`" while the user was in the other repo; it failed twice.
 - Rule: every command I hand over runs from anywhere — an absolute path (`node ~/Claude/QA/qa-jp-ai-scanner/dist/qa-scan.mjs …`) or a `cd` in the same line.
+
+## A fixed test date is a time bomb when anything reads the real clock (2026-11-22)
+- Owner tests issued proofs at a fixed test date (2026-11-20 03:00 UTC) but checked
+  them with the engine's `proofCovers()`, which defaults to `Date.now()`. 24 hours
+  later every proof looked expired and 6 tests failed, with no code change.
+- Rule: when tests use a fake clock, pass that clock to every function that takes
+  a time, including the engine's. Grep the tests for calls that default to now.
