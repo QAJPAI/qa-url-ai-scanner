@@ -324,7 +324,7 @@ test('when an active check ran, the result says so', async () => {
     owner: {
       scanOwner: async (url, proof) => {
         const host = new URL(url).hostname;
-        assert.ok(proofCovers(proof, host));
+        assert.ok(proofCovers(proof, host, app.clock.now.getTime()));
         const a = ownerAssessment(host);
         a.coverage = buildLedger('url', [
           { checker: 'files', mode: 'active', reports: [{ ruleId: 'R11', status: 'checked' }] },

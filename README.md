@@ -57,8 +57,32 @@ Requires Node.js 22 and MongoDB.
 npm install
 npm test
 npm run build
-pm2 start deploy/ecosystem.config.cjs   # edit the values marked CHANGE first
 ```
+
+### On the server (git + pm2)
+
+Once:
+
+```sh
+git clone https://github.com/QAJPAI/qa-url-ai-scanner.git ~/url-jp-ai
+mkdir -p ~/.config/url-jp-ai && touch ~/.config/url-jp-ai/secrets.env && chmod 600 ~/.config/url-jp-ai/secrets.env
+echo "SESSION_SECRET=$(openssl rand -base64 48)" >> ~/.config/url-jp-ai/secrets.env
+# add RESEND_API_KEY=... when the url.jp.ai domain is verified at Resend
+```
+
+Every deploy (and every roll-back, with an older tag or commit):
+
+```sh
+~/url-jp-ai/scripts/deploy.sh            # latest main
+~/url-jp-ai/scripts/deploy.sh <tag>      # a specific version
+```
+
+It checks out the version, runs `npm ci`, the tests and the build, and only
+then reloads pm2 and checks that the server answers. A failure at any step
+leaves the running server untouched. `deploy/ecosystem.config.cjs` holds no
+secrets: they come from `~/.config/url-jp-ai/secrets.env` (or the file named by
+`URL_JP_AI_SECRETS`), so nothing on the server needs editing inside the
+repository.
 
 nginx in front: see [deploy/nginx.conf.example](deploy/nginx.conf.example).
 Without `MONGODB_URI` the server keeps everything in memory (development only;
