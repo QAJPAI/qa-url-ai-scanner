@@ -116,8 +116,9 @@ export async function startApp(
       }),
     scanOwner: async (url, proof, o) => {
       const host = new URL(url).hostname;
-      // As the engine does: the proof must cover the site.
-      if (!proofCovers(proof, host)) throw new Error('proof does not cover');
+      // As the engine does: the proof must cover the site, judged at the test clock's time
+      // (the real clock would make every proof issued at the fixed test date look expired).
+      if (!proofCovers(proof, host, clock.now.getTime())) throw new Error('proof does not cover');
       ownerScans.push({ url, activeChecks: o.activeChecks });
       return ownerAssessment(host);
     },
