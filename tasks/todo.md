@@ -100,6 +100,21 @@ Still open for step 2:
         Chromium with the real engine against the engine's case site: first
         result, fix published, re-check shows the key as confirmed fixed.
 - [x] Engine dependency: `v0.11.0` (2026-11-24).
+- [x] Strengthening 5 and 6 (2026-11-24, engine 0.12.0).
+      - 5 is the engine's: the owner check reads the scripts that scripts
+        load. Here: the owner start page, the session page and the terms
+        (article 3) say so.
+      - 6: the owner result lists the rules a site check cannot examine and
+        shows the engine's request for a source review. The general pointer
+        to the pre-release check is dropped where this section is shown.
+      - 52 tests. Walked in Chromium with the real engine: a key in a chunk
+        that loads later is reported with the chunk as its place, the public
+        check requests only the page and its entry script, and after the key
+        is removed the re-check shows it as confirmed fixed.
+- [ ] Pin the engine to the tag `v0.12.0` once it exists (pinned to the
+      branch commit until then).
+- [ ] Terms, article 3: the sentence about reading scripts that scripts load
+      is new. Include it in the legal review before production.
 - [ ] MongoDB: `firstOwnerResult` has not run against a real MongoDB yet (the
       download of a test server is blocked in the build sandbox). Run
       `MONGODB_URI=… npm test` on the server.

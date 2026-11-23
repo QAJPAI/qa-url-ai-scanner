@@ -127,6 +127,8 @@ pre.copy {
 }
 .fixrequest { max-height: 26rem; overflow: auto; }
 .steps { padding-left: 1.4rem; }
+.rules { padding-left: 1.4rem; columns: 2 18rem; column-gap: 2rem; font-size: 0.92rem; color: var(--ink-2); }
+.rules li { break-inside: avoid; }
 .changes h3 { font-size: 1rem; margin: 1.2rem 0 0.4rem; }
 .changes .none { color: var(--ink-3); margin: 0; }
 .changes .finding { margin-bottom: 0.8rem; }

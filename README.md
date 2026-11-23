@@ -28,7 +28,10 @@ layer only, so url.jp.ai and the engine's reports never disagree.
   still covers the site, and is deleted when the proof expires. Owner checks
   include active checks (requesting `.env` and similar paths); `ACTIVE_CHECKS=off`
   turns them off at once, and the result then says only page-view-level access
-  was made.
+  was made. For an owner the engine also reads the scripts that the page's
+  scripts load (the chunks of a split build), so a key that loads later with
+  another screen is found. The owner is told so before verifying, and the
+  terms say so.
 
   **Fixing, and confirming the fix.** When problems were found, the result
   holds a fix request: one text the owner pastes into their AI coding tool,
@@ -43,6 +46,17 @@ layer only, so url.jp.ai and the engine's reports never disagree.
   most), because the first result is deleted with the proof. This is
   deliberate: over a longer gap a site changes for other reasons too, and a
   comparison with an old result would say less.
+
+  **What cannot be examined from outside.** Most rules cannot be answered by
+  looking at a published site, and the table lists them as "not examined".
+  Below the table the result gives the next step: the rules by name, and one
+  text for the owner's AI coding tool (the engine's `renderSourceReview()`)
+  that runs the pre-release check on the source code and then has the AI
+  review each of those rules. The page says plainly that the AI's review is
+  not a result of this tool: the grade and the table do not change. Which
+  rules are listed is the engine's decision (`sourceReviewRules()`). The text
+  names rules only, nothing of the site's result, and is still shown to the
+  owner only.
 
 The result page also points to QA.JP.AI's free pre-release check, for finding
 problems in the code before it is published.
