@@ -25,7 +25,7 @@
   },
   "dependencies": {
     "mongodb": "^6.22.0",
-    "qa-jp-ai-scanner": "github:QAJPAI/qa-jp-ai-scanner#6ddc8ea37c2e21bbc8417871712ffca9f73e5093"
+    "qa-jp-ai-scanner": "github:QAJPAI/qa-jp-ai-scanner#52718110ec20dc0c570e8ca2b657b77480d9f7a9"
   },
   "devDependencies": {
     "@types/node": "^22.20.5",

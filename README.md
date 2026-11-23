@@ -33,6 +33,12 @@ layer only, so url.jp.ai and the engine's reports never disagree.
   another screen is found. The owner is told so before verifying, and the
   terms say so.
 
+  Where the site's code names Supabase tables or public storage buckets, the
+  engine puts those names into the questions it asks the owner ("are the
+  files in `id-cards` meant for everyone?"). It reads them from the scripts
+  it already has and makes no request to Supabase; the page shows the
+  engine's wording as it is.
+
   **Fixing, and confirming the fix.** When problems were found, the result
   holds a fix request: one text the owner pastes into their AI coding tool,
   with steps per problem and the conditions the AI must keep (the engine's

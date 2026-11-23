@@ -548,6 +548,38 @@ test('the owner is told that scripts loaded later are read too', async () => {
   assert.match(await text(await app.get('/terms')), /所有者向けの検査では、ページのスクリプトが後から読み込む別のスクリプトを読むこと/);
 });
 
+test('a question about a public bucket is shown to the owner with the name the code gives, and not to the public', async () => {
+  const check = siteCheck(false, T1);
+  check.records = [
+    recordFactory('url.storage-hint', 'url', 'passive').needsValidation({
+      ruleId: 'R06',
+      code: 'storage.supabase_public_bucket',
+      key: 'supabase:id-cards',
+      location: 'https://example.jp/assets/app.js',
+      evidence: ja.evidence.publicBucket('id-cards<b>'),
+      blocker: 'requires_owner_intent',
+    }),
+  ];
+  check.coverage = buildLedger('url', [
+    { checker: 'url.storage-hint', mode: 'passive', reports: [{ ruleId: 'R06', status: 'partial', note: 'names_in_code_only' }] },
+  ]);
+  const app = await startWithChecks([inspected(check)]);
+  const owner = await signInByEmail(app);
+  const path = await runOwnerCheck(app, owner);
+  const body = await text(await app.get(path, owner));
+
+  // The engine's wording, with the name from the site's code escaped.
+  assert.ok(body.includes(`${ja.needsValidationText['storage.supabase_public_bucket']!.title}（R06）`));
+  assert.ok(body.includes('バケット「id-cards&lt;b&gt;」'));
+  assert.equal(body.includes('id-cards<b>'), false);
+  assert.ok(body.includes(`一部のみ検査（${ja.coverageNoteLabel.names_in_code_only}）`));
+  // A question is not a problem: no fix request, and R06 is not handed to the source review.
+  assert.equal(body.includes('<pre class="copy fixrequest" '), false);
+  assert.equal(/<ul class="rules">[\s\S]*?R06 [\s\S]*?<\/ul>/.test(body), false);
+  // Nobody else gets the page.
+  assert.equal((await app.get(path)).status, 404);
+});
+
 test('owner paths accept only their methods', async () => {
   const app = await start();
   assert.equal((await app.get('/owner/check')).status, 405);
