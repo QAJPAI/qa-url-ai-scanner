@@ -134,9 +134,6 @@ MONGODB_URI=mongodb://127.0.0.1:27017 npm test
   (`MONGODB_URI=… npm test`). They include the lookup that the re-check
   comparison uses (`firstOwnerResult`), which has only run against the
   in-memory store so far.
-- The engine dependency must name a tag. While the fix request and re-check
-  are in review it names a commit of the engine's branch; change it to
-  `#v0.11.0` once that tag exists.
 
 ## Licence
 

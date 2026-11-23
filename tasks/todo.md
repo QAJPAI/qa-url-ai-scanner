@@ -99,8 +99,7 @@ Still open for step 2:
       - 49 tests; each new safeguard removed once to see a test fail. Walked in
         Chromium with the real engine against the engine's case site: first
         result, fix published, re-check shows the key as confirmed fixed.
-- [ ] Re-pin the engine to `#v0.11.0` once the tag exists (today: a commit of
-      the engine's branch, so this must not be deployed as it is).
+- [x] Engine dependency: `v0.11.0` (2026-11-24).
 - [ ] MongoDB: `firstOwnerResult` has not run against a real MongoDB yet (the
       download of a test server is blocked in the build sandbox). Run
       `MONGODB_URI=… npm test` on the server.
