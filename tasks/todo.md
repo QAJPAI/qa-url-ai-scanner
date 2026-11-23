@@ -91,8 +91,23 @@ Still open for step 2:
 
 ## Step 3
 
-- [ ] A fix request and re-check for verified owners (the engine already
-      supports the URL layer).
+- [x] A fix request and re-check for verified owners (2026-11-23, engine 0.11.0).
+      - The result page shows the engine's fix request when problems were found.
+      - Every later check of a session is compared with its first one
+        (`Store.firstOwnerResult`), by the engine (`compareAssessments` with
+        `servedTextReader`). The comparison is stored with the result.
+      - 49 tests; each new safeguard removed once to see a test fail. Walked in
+        Chromium with the real engine against the engine's case site: first
+        result, fix published, re-check shows the key as confirmed fixed.
+- [x] Engine dependency: `v0.11.0` (2026-11-24).
+- [ ] MongoDB: `firstOwnerResult` has not run against a real MongoDB yet (the
+      download of a test server is blocked in the build sandbox). Run
+      `MONGODB_URI=… npm test` on the server.
+- [x] Decided (iQi, 2026-11-24): the comparison stays within the 24 hours a
+      session lasts. The longer the gap, the more the site may have changed
+      for other reasons, so a comparison with an old result says less; and
+      owner details never outlive the proof that allowed them. After 24 hours
+      the owner verifies again and starts from a fresh first check.
 
 ## Decided (2026-11-20)
 

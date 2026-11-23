@@ -1,11 +1,22 @@
 // Copyright (C) 2026 iQi
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { type Assessment, type AssessmentRecord, cleanText, ja, summarize } from 'qa-jp-ai-scanner';
+import {
+  type Assessment,
+  type AssessmentRecord,
+  cleanText,
+  type Comparison,
+  ja,
+  renderFixRequest,
+  summarize,
+} from 'qa-jp-ai-scanner';
 import type { OwnerSession } from '../store/types';
 import { type Html, html } from './html';
 import { layout, type PageContext, preReleaseBox } from './pages';
 
 const t = ja.report;
+const c = ja.comparison;
+/** The engine's report headings start with a mark for plain text; a page has real headings. */
+const heading = (text: string) => text.replace(/^■ /, '');
 
 const JST = new Intl.DateTimeFormat('ja-JP', {
   timeZone: 'Asia/Tokyo',
@@ -76,6 +87,21 @@ export const ownerText = {
   needsNone: 'ありません。',
   coverageRule: 'ルール',
   coverageStatus: '状態',
+  changesHeading: '前回からの変化',
+  changesIntro: (previous: string) =>
+    `最初の検査: ${previous}。もう一度検査するたびに、この確認で最初に行った検査からの変化を表示します。`,
+  changesStillBelow: '詳しい内容は、下の「見つかった問題」に表示しています。',
+  fixHeading: 'AI に修正を依頼する',
+  fixIntro:
+    '見つかった問題の直し方を、AI コーディングツール（Claude Code、Cursor など）にそのまま渡せる文章にまとめました。問題ごとの手順と、AI に守ってほしいことが書かれています。',
+  fixSteps: [
+    'サイトを作ったプロジェクトを AI コーディングツールで開き、下の枠の文章をすべてコピーして貼り付けます（枠の中を押すと、全体が選択されます）。',
+    'AI の説明を確認しながら修正を進め、サイトを公開し直します。キーの無効化と再発行は、ご自身で発行元の管理画面から行ってください。',
+    'このページの「もう一度検査する」を押します。修正を確認できた項目が「前回からの変化」に表示されます。',
+  ],
+  fixWindow: (until: string) =>
+    `修正の確認は、所有者の確認が有効な間（${until} まで）に、このブラウザーでもう一度検査すると表示されます。有効期限を過ぎたあとは、所有者の確認からやり直すと検査できますが、今回の結果との比較は表示されません。`,
+  fixPrivate: 'この文章には、問題の場所が書かれています。修正を依頼する AI コーディングツール以外には、共有しないでください。',
 };
 
 function startPart(target: string): Html {
@@ -208,6 +234,64 @@ function question(r: Extract<AssessmentRecord, { verdict: 'needs_validation' }>)
 </li>`;
 }
 
+type Confirmed = Extract<AssessmentRecord, { verdict: 'confirmed' }>;
+
+/** One line of "what changed": the problem, where it was, and one remark (a note or a reason). */
+function change(r: Confirmed, remark?: { label: string; text: string }): Html {
+  const text = ja.findingTextFor(r.layer, r.code);
+  return html`<li class="finding sev-${r.severity}">
+<p class="title"><span class="sev">${r.severity}・${ja.severityLabel[r.severity]}</span> ${text?.title ?? r.code}（${r.ruleId}）</p>
+<dl>
+<dt>${t.location}</dt><dd>${cleanText(r.location)}</dd>
+${remark ? html`<dt>${remark.label}</dt><dd>${remark.text}</dd>` : ''}
+</dl>
+</li>`;
+}
+
+function changeList(title: string, items: Html[], after?: string): Html {
+  return html`<h3>${heading(title)}</h3>
+${items.length === 0 ? html`<p class="none">${c.none}</p>` : html`<ol class="findings">${items}</ol>${after ? html`<p class="note">${after}</p>` : ''}`}`;
+}
+
+/**
+ * What changed since the first check of this session. Every judgement here
+ * is the engine's (compareAssessments); the page only lays it out.
+ */
+function changesSection(cmp: Comparison): Html {
+  const bySeverity = (a: Confirmed, b: Confirmed) => a.severity.localeCompare(b.severity);
+  const fixed = [...cmp.fixed].sort(bySeverity).map((r) => {
+    const note = ja.afterFixNoteFor(r.layer, r.code);
+    return change(r, note ? { label: c.note, text: note } : undefined);
+  });
+  const unverified = [...cmp.unverified]
+    .sort((a, b) => bySeverity(a.record, b.record))
+    .map((u) => change(u.record, { label: c.reason, text: ja.unverifiedReasonLabelFor(u.record.layer, u.reason) }));
+  return html`<section class="box changes">
+<h2>${ownerText.changesHeading}</h2>
+<p class="note">${ownerText.changesIntro(when(cmp.previousAt))}</p>
+${cmp.toolChanged ? html`<p class="warn">${c.toolChanged}</p>` : ''}
+${changeList(c.fixedHeading(cmp.fixed.length), fixed)}
+${changeList(c.unverifiedHeading(cmp.unverified.length), unverified)}
+${changeList(c.stillHeading(cmp.stillPresent.length), [...cmp.stillPresent].sort(bySeverity).map((r) => change(r)), ownerText.changesStillBelow)}
+${changeList(c.newHeading(cmp.newConfirmed.length), [...cmp.newConfirmed].sort(bySeverity).map((r) => change(r)), ownerText.changesStillBelow)}
+<h3>${heading(c.questionsHeading)}</h3>
+<p>${c.questionsLine(cmp.questionsResolved.length, cmp.questionsOpen.length, cmp.questionsNew.length, cmp.questionsUnverified.length)}</p>
+<p class="note">${c.meaning}</p>
+</section>`;
+}
+
+/** The request to paste into an AI coding tool. The text is the engine's; shown when there is something to fix. */
+function fixRequestSection(assessment: Assessment, session: OwnerSession): Html {
+  return html`<section>
+<h2>${ownerText.fixHeading}</h2>
+<p>${ownerText.fixIntro}</p>
+<ol class="steps">${ownerText.fixSteps.map((step) => html`<li>${step}</li>`)}</ol>
+<pre class="copy fixrequest" tabindex="0">${renderFixRequest(assessment)}</pre>
+<p class="note">${ownerText.fixPrivate}</p>
+<p class="note">${ownerText.fixWindow(when(session.expiresAt))}</p>
+</section>`;
+}
+
 function coverageDetail(unit: Assessment['coverage'][number]): string {
   if (unit.status === 'not_run' && unit.reason) return ja.notRunReasonLabel[unit.reason];
   if (unit.status === 'partial' && unit.note) return ja.coverageNoteLabel[unit.note];
@@ -219,7 +303,12 @@ function coverageDetail(unit: Assessment['coverage'][number]): string {
  * The owner's detailed result. Rendered only after the caller has checked that
  * this session ran it and that the session's proof still covers the site.
  */
-export function ownerReportPage(ctx: PageContext, assessment: Assessment, session: OwnerSession): string {
+export function ownerReportPage(
+  ctx: PageContext,
+  assessment: Assessment,
+  session: OwnerSession,
+  comparison?: Comparison,
+): string {
   const s = summarize(assessment, 'owner');
   // Say what actually ran: with active checks switched off, only page-view-level access did.
   const ranActive = assessment.coverage.some((u) => u.mode === 'active');
@@ -254,16 +343,18 @@ ${s.coverage.error > 0 ? html`<li class="warn">${t.incomplete(s.coverage.error)}
 </ul>
 <p class="box gated">${ownerText.reportPrivate}</p>
 </section>
+${comparison ? changesSection(comparison) : ''}
 <section>
-<h2>${t.findingsHeading.replace(/^■ /, '')}</h2>
+<h2>${heading(t.findingsHeading)}</h2>
 ${confirmed.length === 0 ? html`<p>${ownerText.findingsNone}</p>` : html`<ol class="findings">${confirmed.map(finding)}</ol>`}
 </section>
 <section>
-<h2>${t.needsValidationHeading.replace(/^■ /, '')}</h2>
+<h2>${heading(t.needsValidationHeading)}</h2>
 ${questions.length === 0 ? html`<p>${ownerText.needsNone}</p>` : html`<ol class="findings">${questions.map(question)}</ol>`}
 </section>
+${confirmed.length > 0 ? fixRequestSection(assessment, session) : ''}
 <section>
-<h2>${t.coverageHeading.replace(/^■ /, '')}</h2>
+<h2>${heading(t.coverageHeading)}</h2>
 <table class="coverage">
 <thead><tr><th>${ownerText.coverageRule}</th><th>${ownerText.coverageStatus}</th></tr></thead>
 <tbody>

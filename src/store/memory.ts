@@ -87,5 +87,15 @@ export class MemoryStore implements Store {
     return r && r.expiresAt > now ? structuredClone(r) : null;
   }
 
+  async firstOwnerResult(sessionHash: string, now: Date): Promise<OwnerResult | null> {
+    let first: OwnerResult | null = null;
+    // Insertion order breaks ties, so the first one saved wins.
+    for (const r of this.ownerResults.values()) {
+      if (r.sessionHash !== sessionHash || r.expiresAt <= now) continue;
+      if (!first || r.createdAt < first.createdAt) first = r;
+    }
+    return first ? structuredClone(first) : null;
+  }
+
   async close(): Promise<void> {}
 }

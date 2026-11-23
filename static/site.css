@@ -125,6 +125,11 @@ pre.copy {
   white-space: pre-wrap; overflow-wrap: anywhere; background: var(--bg); border: 1px solid var(--line);
   border-radius: 6px; padding: 0.8rem 1rem; font-size: 0.85rem; color: var(--ink-2); user-select: all;
 }
+.fixrequest { max-height: 26rem; overflow: auto; }
+.steps { padding-left: 1.4rem; }
+.changes h3 { font-size: 1rem; margin: 1.2rem 0 0.4rem; }
+.changes .none { color: var(--ink-3); margin: 0; }
+.changes .finding { margin-bottom: 0.8rem; }
 .signout { margin: 1.5rem 0; }
 .findings { padding-left: 1.25rem; }
 .finding { margin: 0 0 1.4rem; }

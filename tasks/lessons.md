@@ -41,3 +41,7 @@ posts; the tests set `Origin` themselves.
   later every proof looked expired and 6 tests failed, with no code change.
 - Rule: when tests use a fake clock, pass that clock to every function that takes
   a time, including the engine's. Grep the tests for calls that default to now.
+
+## Commands for the user must not assume the state of their machine (2026-11-24)
+- I gave `git checkout main && git pull && git tag … && git push origin …` to tag a release. The owner's local `main` had one unpushed commit, so `git pull` stopped on divergent branches. The `&&` chain kept anything wrong from happening, but the tag was not made.
+- Rule: when a command only needs what is on GitHub, name it directly (`git fetch origin && git tag vX.Y.Z origin/main && git push origin vX.Y.Z`) and leave local branches alone. Never route a release step through `git pull` on a machine I cannot see. Keep chaining with `&&` so a failed step stops the rest.
