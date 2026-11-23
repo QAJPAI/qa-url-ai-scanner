@@ -7,8 +7,8 @@ import { after, test } from 'node:test';
 import { closeAgents, WELL_KNOWN_PATH } from 'qa-jp-ai-scanner';
 import { loadConfig } from '../src/config';
 import { cookieNames } from '../src/http/cookies';
-import { buildLedger, proofCovers } from 'qa-jp-ai-scanner';
-import { cookieOf, ownerAssessment, startApp, type TestApp } from './helpers';
+import { type Assessment, buildLedger, proofCovers, recordFactory, type UrlInspection } from 'qa-jp-ai-scanner';
+import { cookieOf, inspected, ownerAssessment, startApp, type TestApp } from './helpers';
 
 const apps: TestApp[] = [];
 const closers: Array<() => Promise<void>> = [];
@@ -322,20 +322,147 @@ test('owner checks are limited per session; the switch turns active checks off',
 test('when an active check ran, the result says so', async () => {
   const app = await start({
     owner: {
-      scanOwner: async (url, proof) => {
+      inspectOwner: async (url, proof) => {
         const host = new URL(url).hostname;
         assert.ok(proofCovers(proof, host, app.clock.now.getTime()));
         const a = ownerAssessment(host);
         a.coverage = buildLedger('url', [
           { checker: 'files', mode: 'active', reports: [{ ruleId: 'R11', status: 'checked' }] },
         ]);
-        return a;
+        return inspected(a);
       },
     },
   });
   const owner = await signInByEmail(app);
   const body = await text(await app.get(await runOwnerCheck(app, owner), owner));
   assert.match(body, /所有者確認後にのみ行う検査/);
+});
+
+// ---------------------------------------------------------------- fixing, and confirming the fix
+
+const keyRecord = () =>
+  recordFactory('url.secrets', 'url', 'passive').confirmed({
+    ruleId: 'R02',
+    code: 'secret.openai',
+    key: 'k1',
+    location: 'https://example.jp/assets/app.js (offset 10)',
+    evidence: '先頭「sk-pro」で始まる 48 文字の文字列 <img src=x onerror=alert(1)>',
+    severity: 'P0',
+  });
+
+/** An owner result with or without the key, as the engine's own checker would report it. */
+function siteCheck(withKey: boolean, startedAt: string): Assessment {
+  const a = ownerAssessment('example.jp', startedAt);
+  a.records = withKey ? [keyRecord()] : [];
+  a.coverage = buildLedger('url', [
+    { checker: 'url.secrets', mode: 'passive', reports: [{ ruleId: 'R02', status: 'partial', note: 'html_referenced_scripts_only' }] },
+  ]);
+  return a;
+}
+
+/** An app whose owner checks return the given results in turn. */
+async function startWithChecks(checks: UrlInspection[]) {
+  let n = 0;
+  return start({ owner: { inspectOwner: async () => checks[Math.min(n++, checks.length - 1)]! } });
+}
+
+const T1 = '2026-11-20T03:00:00.000Z';
+const T2 = '2026-11-20T04:00:00.000Z';
+const T3 = '2026-11-20T05:00:00.000Z';
+
+test('the first result offers a fix request for an AI coding tool, and no comparison', async () => {
+  const app = await startWithChecks([inspected(siteCheck(true, T1))]);
+  const owner = await signInByEmail(app);
+  const body = await text(await app.get(await runOwnerCheck(app, owner), owner));
+
+  assert.match(body, /<h2>AI に修正を依頼する<\/h2>/);
+  // The engine's text for a site, with the problem's ID, inside one block that can be copied whole.
+  const request = unescape(/<pre class="copy fixrequest"[^>]*>([\s\S]*?)<\/pre>/.exec(body)![1]!);
+  assert.match(request, /^# QA\.JP\.AI 修正依頼/);
+  assert.match(request, /URL 検査（公開中のサイトを外部から見る検査）/);
+  assert.ok(request.includes(keyRecord().fingerprint));
+  assert.match(request, /再検査は利用者が行います/);
+  assert.equal(request.includes('npx'), false);
+  // Text from the checked site stays text.
+  assert.equal(body.includes('<img src=x'), false);
+  // The owner is told how long a fix can be confirmed.
+  assert.match(body, /修正の確認は、所有者の確認が有効な間（2026\/11\/21 12:00（日本時間） まで）/);
+
+  assert.equal(body.includes('<h2>前回からの変化</h2>'), false);
+  assert.equal([...app.store.ownerResults.values()][0]!.comparison, undefined);
+});
+
+test('checking again shows what the engine confirms as fixed', async () => {
+  const app = await startWithChecks([inspected(siteCheck(true, T1)), inspected(siteCheck(false, T2))]);
+  const owner = await signInByEmail(app);
+  const first = await runOwnerCheck(app, owner);
+  const body = await text(await app.get(await runOwnerCheck(app, owner), owner));
+
+  assert.match(body, /<h2>前回からの変化<\/h2>/);
+  assert.match(body, /最初の検査: 2026\/11\/20 12:00（日本時間）。/);
+  assert.match(body, /<h3>修正を確認しました（1 件）<\/h3>/);
+  assert.match(body, /OpenAI の API キーがフロントエンドに含まれています（R02）/);
+  // What the tool cannot see is said next to the fixed item.
+  assert.match(body, /キーの無効化・再発行が済んだかどうかは、ツールでは確認できません/);
+  assert.match(body, /<h3>見つからなくなりましたが、修正とは確認できません（0 件）<\/h3>/);
+  assert.match(body, /安全性を保証するものではありません/);
+  // Nothing left to fix: no request to hand to an AI.
+  assert.equal(body.includes('AI に修正を依頼する'), false);
+  assert.equal(body.includes('<img src=x'), false);
+
+  // The first result is unchanged and still has no comparison.
+  assert.equal((await text(await app.get(first, owner))).includes('<h2>前回からの変化</h2>'), false);
+});
+
+test('a key that is gone because a script was not read is not shown as fixed', async () => {
+  const app = await startWithChecks([inspected(siteCheck(true, T1)), inspected(siteCheck(false, T2), false)]);
+  const owner = await signInByEmail(app);
+  await runOwnerCheck(app, owner);
+  const body = await text(await app.get(await runOwnerCheck(app, owner), owner));
+
+  assert.match(body, /<h3>修正を確認しました（0 件）<\/h3>/);
+  assert.match(body, /<h3>見つからなくなりましたが、修正とは確認できません（1 件）<\/h3>/);
+  assert.match(body, /問題のあったスクリプトも読んでいません/);
+});
+
+test('every later check is compared with the first one of the session', async () => {
+  const app = await startWithChecks([
+    inspected(siteCheck(true, T1)),
+    inspected(siteCheck(false, T2)),
+    inspected(siteCheck(false, T3)),
+  ]);
+  const owner = await signInByEmail(app);
+  await runOwnerCheck(app, owner);
+  app.clock.now = new Date(T2);
+  await runOwnerCheck(app, owner);
+  app.clock.now = new Date(T3);
+  const body = await text(await app.get(await runOwnerCheck(app, owner), owner));
+  // Compared with the second check, nothing would have changed.
+  assert.match(body, /<h3>修正を確認しました（1 件）<\/h3>/);
+  assert.match(body, /最初の検査: 2026\/11\/20 12:00（日本時間）。/);
+});
+
+test('a comparison never crosses sessions', async () => {
+  const app = await startWithChecks([inspected(siteCheck(true, T1)), inspected(siteCheck(false, T2))]);
+  const first = await signInByEmail(app, 'info@example.jp');
+  await runOwnerCheck(app, first);
+  // Another verified person, same site: their first check has nothing to be compared with.
+  const second = await signInByEmail(app, 'admin@example.jp');
+  const body = await text(await app.get(await runOwnerCheck(app, second), second));
+  assert.equal(body.includes('<h2>前回からの変化</h2>'), false);
+});
+
+test('a result for another host of the site is shown without a comparison', async () => {
+  const moved = siteCheck(false, T2);
+  moved.target = { layer: 'url', host: 'www.example.jp' };
+  const app = await startWithChecks([inspected(siteCheck(true, T1)), inspected(moved)]);
+  const owner = await signInByEmail(app);
+  await runOwnerCheck(app, owner);
+  const location = await runOwnerCheck(app, owner);
+  assert.equal([...app.store.ownerResults.values()].at(-1)!.comparison, undefined);
+  assert.equal(app.errors.length, 0);
+  // The session's proof is for example.jp only (email method), so this result is not shown at all.
+  assert.equal((await app.get(location, owner)).status, 404);
 });
 
 test('owner paths accept only their methods', async () => {

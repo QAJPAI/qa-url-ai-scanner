@@ -11,6 +11,7 @@ import {
   type PublicSummary,
   recordFactory,
   RULES_VERSION,
+  type UrlInspection,
   verifyByDns,
   verifyByFile,
 } from 'qa-jp-ai-scanner';
@@ -67,6 +68,13 @@ export function ownerAssessment(host: string, startedAt = '2026-11-20T03:00:00.0
   };
 }
 
+/** An owner check that read the page and every script it references. */
+export const inspected = (assessment: Assessment, everythingRead = true): UrlInspection => ({
+  assessment,
+  everythingRead,
+  textsRead: new Set<string>(),
+});
+
 export interface TestApp {
   base: string;
   store: MemoryStore;
@@ -114,13 +122,13 @@ export async function startApp(
         if (!found) throw Object.assign(new Error('not found'), { code: 'ENOTFOUND' });
         return found;
       }),
-    scanOwner: async (url, proof, o) => {
+    inspectOwner: async (url, proof, o) => {
       const host = new URL(url).hostname;
       // As the engine does: the proof must cover the site, judged at the test clock's time
       // (the real clock would make every proof issued at the fixed test date look expired).
       if (!proofCovers(proof, host, clock.now.getTime())) throw new Error('proof does not cover');
       ownerScans.push({ url, activeChecks: o.activeChecks });
-      return ownerAssessment(host);
+      return inspected(ownerAssessment(host));
     },
     mailer: options.noMailer ? undefined : { send: async (m) => void mails.push(m) },
     ...options.owner,

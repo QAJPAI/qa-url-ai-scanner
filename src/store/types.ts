@@ -1,6 +1,6 @@
 // Copyright (C) 2026 iQi
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import type { Assessment, PublicSummary } from 'qa-jp-ai-scanner';
+import type { Assessment, Comparison, PublicSummary } from 'qa-jp-ai-scanner';
 
 /** A public result, shown at /r/<id>. It holds the public summary and nothing more. */
 export interface StoredResult {
@@ -78,6 +78,11 @@ export interface OwnerResult {
   id: string;
   sessionHash: string;
   assessment: Assessment;
+  /**
+   * What changed since the first check of this session, as the engine judged
+   * it when this check ran. Absent on the first check.
+   */
+  comparison?: Comparison;
   createdAt: Date;
   expiresAt: Date;
 }
@@ -107,6 +112,8 @@ export interface Store {
 
   saveOwnerResult(result: OwnerResult): Promise<void>;
   getOwnerResult(id: string, now: Date): Promise<OwnerResult | null>;
+  /** The earliest result of this session that is still kept: what later checks are compared with. */
+  firstOwnerResult(sessionHash: string, now: Date): Promise<OwnerResult | null>;
 
   close(): Promise<void>;
 }

@@ -80,6 +80,14 @@ for (const [name, open, cleanUp] of stores) {
       await store.saveOwnerResult(owner);
       assert.equal((await store.getOwnerResult(owner.id, t0))?.sessionHash, session.hash);
       assert.equal(await store.getOwnerResult(owner.id, later(60_000)), null, 'expired');
+
+      // The first result of a session is what later checks are compared with.
+      await store.saveOwnerResult({ ...owner, id: 'p'.repeat(22), createdAt: later(1000) });
+      await store.saveOwnerResult({ ...owner, id: 'q'.repeat(22), sessionHash: 'x'.repeat(43), createdAt: new Date(t0.getTime() - 1000) });
+      assert.equal((await store.firstOwnerResult(session.hash, later(2000)))?.id, owner.id);
+      assert.equal((await store.firstOwnerResult('x'.repeat(43), t0))?.id, 'q'.repeat(22), 'each session has its own');
+      assert.equal(await store.firstOwnerResult('none', t0), null);
+      assert.equal(await store.firstOwnerResult(session.hash, later(60_000)), null, 'expired');
     } finally {
       await store.close();
       await cleanUp();

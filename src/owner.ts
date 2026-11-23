@@ -4,6 +4,9 @@ import { createHmac, randomBytes } from 'node:crypto';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import {
   type Assessment,
+  compareAssessments,
+  type Comparison,
+  ComparisonError,
   dnsRecordName,
   evaluateEmailOwnership,
   issueEmailProofAfterLinkClick,
@@ -17,6 +20,8 @@ import {
   scanErrorKind,
   scanErrorMessage,
   sealProof,
+  servedTextReader,
+  type UrlInspection,
   WELL_KNOWN_PATH,
 } from 'qa-jp-ai-scanner';
 import type { Config } from './config';
@@ -34,11 +39,12 @@ import type { AuditAction, AuditOutcome, OwnerSession, Store } from './store/typ
 export interface OwnerDeps {
   verifyFile: (origin: string, token: string) => Promise<OwnershipProof | undefined>;
   verifyDns: (host: string, token: string) => Promise<OwnershipProof | undefined>;
-  scanOwner: (
+  /** The owner check: the assessment, and what was read (needed to judge a later fix). */
+  inspectOwner: (
     url: string,
     proof: OwnershipProof,
     options: { maxDurationMs: number; activeChecks: boolean },
-  ) => Promise<Assessment>;
+  ) => Promise<UrlInspection>;
   /** Missing: email verification is unavailable. */
   mailer?: Mailer;
 }
@@ -58,6 +64,21 @@ const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
 const VERIFIER_DAYS = 7;
 const RESULT_ID = /^[A-Za-z0-9_-]{22}$/;
+
+/**
+ * What changed since an earlier check of the same site. The engine decides
+ * what counts as fixed; this only hands it the two results and what was read.
+ * No comparison when the earlier result is of another host (the site now
+ * redirects elsewhere within its domain).
+ */
+function changesSince(earlier: Assessment, now: UrlInspection): Comparison | undefined {
+  try {
+    return compareAssessments(earlier, now.assessment, { wasRead: servedTextReader(now) });
+  } catch (err) {
+    if (err instanceof ComparisonError) return undefined;
+    throw err;
+  }
+}
 
 export function createOwnerRoutes(c: Context) {
   const { config, store } = c;
@@ -340,10 +361,10 @@ export function createOwnerRoutes(c: Context) {
       return page(res, 429, site.errorHeading, o.checkLimit);
     }
 
-    let assessment: Assessment;
+    let inspection: UrlInspection;
     try {
-      assessment = await c.limiter.run(() =>
-        c.deps.scanOwner(session.target, proof, {
+      inspection = await c.limiter.run(() =>
+        c.deps.inspectOwner(session.target, proof, {
           maxDurationMs: config.limits.scanBudgetMs,
           activeChecks: config.activeChecks,
         }),
@@ -359,11 +380,17 @@ export function createOwnerRoutes(c: Context) {
       return page(res, 422, site.errorHeading, scanErrorMessage(err));
     }
 
+    // Every later check of a session is compared with its first one, so the
+    // owner sees everything fixed since they started, however often they re-check.
+    const first = await store.firstOwnerResult(hash, c.now());
+    const comparison = first ? changesSince(first.assessment, inspection) : undefined;
+
     const id = c.newId();
     await store.saveOwnerResult({
       id,
       sessionHash: hash,
-      assessment,
+      assessment: inspection.assessment,
+      ...(comparison ? { comparison } : {}),
       createdAt: c.now(),
       // Owner details live no longer than the verification that allowed them.
       expiresAt: session.expiresAt,
@@ -394,7 +421,7 @@ export function createOwnerRoutes(c: Context) {
     // Not found, someone else's, or no longer verified: the same answer.
     if (!allowed) return page(res, 404, site.resultHeading, site.resultNotFound, { 'X-Robots-Tag': 'noindex, nofollow' });
     await audit(ip, 'owner_view', 'shown', { target: current.session.target, method: current.session.method, resultId: id });
-    return send(res, 200, ownerReportPage(ctx, assessment, current.session), undefined, {
+    return send(res, 200, ownerReportPage(ctx, assessment, current.session, stored.comparison), undefined, {
       'X-Robots-Tag': 'noindex, nofollow',
     });
   }

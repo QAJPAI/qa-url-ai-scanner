@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
-import { closeAgents, scanOwner, scanPublic, verifyByDns, verifyByFile } from 'qa-jp-ai-scanner';
+import { closeAgents, inspectOwner, scanPublic, verifyByDns, verifyByFile } from 'qa-jp-ai-scanner';
 import { createApp } from './app';
 import { loadConfig } from './config';
 import { LogMailer, type Mailer, ResendMailer } from './mail';
@@ -45,7 +45,7 @@ const handler = createApp({
   owner: {
     verifyFile: (origin, token) => verifyByFile(origin, token),
     verifyDns: (host, token) => verifyByDns(host, token),
-    scanOwner: (url, proof, options) => scanOwner(url, proof, options),
+    inspectOwner: (url, proof, options) => inspectOwner(url, proof, options),
     mailer,
   },
 });

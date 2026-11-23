@@ -30,6 +30,18 @@ layer only, so url.jp.ai and the engine's reports never disagree.
   turns them off at once, and the result then says only page-view-level access
   was made.
 
+  **Fixing, and confirming the fix.** When problems were found, the result
+  holds a fix request: one text the owner pastes into their AI coding tool,
+  with steps per problem and the conditions the AI must keep (the engine's
+  `renderFixRequest()`). After publishing the fix, the owner presses
+  「もう一度検査する」 and the result shows what changed since the first check of
+  that session: *confirmed fixed*, *gone but not verified* (with the reason),
+  *still present*, *new*. What counts as fixed is decided by the engine
+  (`compareAssessments()`), never by this layer: a key that is gone only
+  because a script could not be read, or was swapped for another key, is not
+  shown as fixed. The comparison lives as long as the session (24 hours at
+  most), because the first result is deleted with the proof.
+
 The result page also points to QA.JP.AI's free pre-release check, for finding
 problems in the code before it is published.
 
@@ -116,7 +128,13 @@ MONGODB_URI=mongodb://127.0.0.1:27017 npm test
 ## Before going public
 
 - The terms and privacy policy are drafts; have them reviewed by a lawyer.
-- Run the MongoDB store tests against the server's MongoDB.
+- Run the MongoDB store tests against the server's MongoDB
+  (`MONGODB_URI=… npm test`). They include the lookup that the re-check
+  comparison uses (`firstOwnerResult`), which has only run against the
+  in-memory store so far.
+- The engine dependency must name a tag. While the fix request and re-check
+  are in review it names a commit of the engine's branch; change it to
+  `#v0.11.0` once that tag exists.
 
 ## Licence
 

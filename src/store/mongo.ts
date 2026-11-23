@@ -62,6 +62,7 @@ export class MongoStore implements Store {
       store.tokens.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
       store.sessions.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
       store.ownerResults.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
+      store.ownerResults.createIndex({ sessionHash: 1, createdAt: 1 }),
     ]);
     return store;
   }
@@ -134,6 +135,14 @@ export class MongoStore implements Store {
 
   async getOwnerResult(id: string, now: Date): Promise<OwnerResult | null> {
     const doc = await this.ownerResults.findOne({ _id: id, expiresAt: { $gt: now } });
+    return doc ? fromDoc(doc, 'id') : null;
+  }
+
+  async firstOwnerResult(sessionHash: string, now: Date): Promise<OwnerResult | null> {
+    const doc = await this.ownerResults.findOne(
+      { sessionHash, expiresAt: { $gt: now } },
+      { sort: { createdAt: 1, _id: 1 } },
+    );
     return doc ? fromDoc(doc, 'id') : null;
   }
 
