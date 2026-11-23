@@ -7,7 +7,16 @@ import { after, test } from 'node:test';
 import { closeAgents, WELL_KNOWN_PATH } from 'qa-jp-ai-scanner';
 import { loadConfig } from '../src/config';
 import { cookieNames } from '../src/http/cookies';
-import { type Assessment, buildLedger, proofCovers, recordFactory, type UrlInspection } from 'qa-jp-ai-scanner';
+import {
+  type Assessment,
+  buildLedger,
+  ENGINE_VERSION,
+  ja,
+  proofCovers,
+  recordFactory,
+  sourceReviewRules,
+  type UrlInspection,
+} from 'qa-jp-ai-scanner';
 import { cookieOf, inspected, ownerAssessment, startApp, type TestApp } from './helpers';
 
 const apps: TestApp[] = [];
@@ -463,6 +472,112 @@ test('a result for another host of the site is shown without a comparison', asyn
   assert.equal(app.errors.length, 0);
   // The session's proof is for example.jp only (email method), so this result is not shown at all.
   assert.equal((await app.get(location, owner)).status, 404);
+});
+
+// ---------------------------------------------------------------- what a site check cannot examine
+
+const sourceRequest = (body: string) => {
+  const m = /<pre class="copy fixrequest sourcereview"[^>]*>([\s\S]*?)<\/pre>/.exec(body);
+  return m ? unescape(m[1]!) : undefined;
+};
+
+test('rules that cannot be examined from outside come with a request for a source review', async () => {
+  const check = siteCheck(true, T1);
+  const app = await startWithChecks([inspected(check)]);
+  const owner = await signInByEmail(app);
+  const body = await text(await app.get(await runOwnerCheck(app, owner), owner));
+
+  assert.match(body, /<h2>URL から調べられない項目を、ソースコードで確認する<\/h2>/);
+  // Which rules is the engine's decision; the page lists each by name.
+  const rules = sourceReviewRules(check);
+  assert.ok(rules.length >= 8);
+  assert.ok(body.includes(`全 15 項目のうち次の ${rules.length} 項目は`));
+  const list = /<ul class="rules">([\s\S]*?)<\/ul>/.exec(body)![1]!;
+  assert.equal(list.split('<li>').length - 1, rules.length);
+  for (const u of rules) assert.ok(list.includes(`<li>${u.ruleId} ${ja.ruleTitle[u.ruleId]}</li>`), u.ruleId);
+  // The rule that was examined is not among them.
+  assert.equal(list.includes('R02 '), false);
+
+  // The text to paste is the engine's: the pre-release check of this version, then the AI's own review.
+  const request = sourceRequest(body)!;
+  assert.match(request, /^# QA\.JP\.AI ソースコードの確認依頼/);
+  assert.ok(request.includes(`npx --yes github:QAJPAI/qa-jp-ai-scanner#v${ENGINE_VERSION} check . --for-ai`));
+  assert.match(request, /必ず「AI による確認」と明記してください/);
+  // It names rules only: nothing of this site's result is in it.
+  assert.equal(request.includes(keyRecord().fingerprint), false);
+  assert.equal(request.includes('/assets/app.js'), false);
+
+  // The page does not pass the AI's review off as its own result.
+  assert.match(body, /QA\.JP\.AI のツールの検査結果ではありません。このページの評価と検査範囲には反映されず/);
+  // The table still says "not examined", with where the rule is confirmed.
+  assert.ok(body.includes(`未検査（${ja.notRunReasonLabel.requires_source}）`));
+  // One pointer to the pre-release check, not two.
+  assert.equal(body.split('公開前チェックの使い方').length - 1, 1);
+  assert.equal(body.includes('公開する前に、コードの段階でチェックしませんか'), false);
+});
+
+test('the request for a source review is there when nothing was found, and only for the owner', async () => {
+  const app = await startWithChecks([inspected(siteCheck(false, T1))]);
+  const owner = await signInByEmail(app);
+  const location = await runOwnerCheck(app, owner);
+  const body = await text(await app.get(location, owner));
+  // Nothing to fix, so no fix request; the unexamined rules are still unexamined.
+  assert.equal(body.includes('<h2>AI に修正を依頼する</h2>'), false);
+  assert.ok(sourceRequest(body));
+
+  // Without the session the result, and with it this section, is not shown.
+  const anonymous = await app.get(location);
+  assert.notEqual(anonymous.status, 200);
+  assert.equal((await text(anonymous)).includes('ソースコードの確認依頼'), false);
+
+  // The public result of the same site says nothing of it.
+  const pub = await app.post({ url: TARGET });
+  const publicBody = await text(await app.get(pub.headers.get('location')!));
+  assert.match(publicBody, /簡易チェック結果/);
+  assert.equal(publicBody.includes('ソースコードの確認依頼'), false);
+  assert.equal(publicBody.includes('URL から調べられない項目'), false);
+});
+
+test('the owner is told that scripts loaded later are read too', async () => {
+  const app = await start();
+  const said = /ページのスクリプトが後から読み込む別のスクリプト（画面を操作したときに読み込まれるもの）も読み/;
+  // Before verifying, and again before starting the check.
+  assert.match(await text(await app.get('/owner?u=' + encodeURIComponent(TARGET))), said);
+  const owner = await signInByEmail(app);
+  assert.match(await text(await app.get('/owner/session', owner)), said);
+  assert.match(await text(await app.get('/terms')), /所有者向けの検査では、ページのスクリプトが後から読み込む別のスクリプトを読むこと/);
+});
+
+test('a question about a public bucket is shown to the owner with the name the code gives, and not to the public', async () => {
+  const check = siteCheck(false, T1);
+  check.records = [
+    recordFactory('url.storage-hint', 'url', 'passive').needsValidation({
+      ruleId: 'R06',
+      code: 'storage.supabase_public_bucket',
+      key: 'supabase:id-cards',
+      location: 'https://example.jp/assets/app.js',
+      evidence: ja.evidence.publicBucket('id-cards<b>'),
+      blocker: 'requires_owner_intent',
+    }),
+  ];
+  check.coverage = buildLedger('url', [
+    { checker: 'url.storage-hint', mode: 'passive', reports: [{ ruleId: 'R06', status: 'partial', note: 'names_in_code_only' }] },
+  ]);
+  const app = await startWithChecks([inspected(check)]);
+  const owner = await signInByEmail(app);
+  const path = await runOwnerCheck(app, owner);
+  const body = await text(await app.get(path, owner));
+
+  // The engine's wording, with the name from the site's code escaped.
+  assert.ok(body.includes(`${ja.needsValidationText['storage.supabase_public_bucket']!.title}（R06）`));
+  assert.ok(body.includes('バケット「id-cards&lt;b&gt;」'));
+  assert.equal(body.includes('id-cards<b>'), false);
+  assert.ok(body.includes(`一部のみ検査（${ja.coverageNoteLabel.names_in_code_only}）`));
+  // A question is not a problem: no fix request, and R06 is not handed to the source review.
+  assert.equal(body.includes('<pre class="copy fixrequest" '), false);
+  assert.equal(/<ul class="rules">[\s\S]*?R06 [\s\S]*?<\/ul>/.test(body), false);
+  // Nobody else gets the page.
+  assert.equal((await app.get(path)).status, 404);
 });
 
 test('owner paths accept only their methods', async () => {

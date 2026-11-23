@@ -7,6 +7,8 @@ import {
   type Comparison,
   ja,
   renderFixRequest,
+  renderSourceReview,
+  sourceReviewRules,
   summarize,
 } from 'qa-jp-ai-scanner';
 import type { OwnerSession } from '../store/types';
@@ -33,7 +35,7 @@ export const ownerText = {
   startIntro: (host: string) =>
     `${host} の所有者であることを確認できると、キーの露出など重大な問題の有無と、その場所・直し方をお見せします。次のいずれかの方法で確認してください。`,
   whatOwnerCheckDoes:
-    '所有者向けの検査では、通常のページ表示に加えて、公開されていてはいけないファイル（.env など）が公開されていないかを、数回のアクセスで確かめます。攻撃やログインの試行は行いません。',
+    '所有者向けの検査では、通常のページ表示に加えて、次の二つを行います。ページのスクリプトが後から読み込む別のスクリプト（画面を操作したときに読み込まれるもの）も読み、キーが含まれていないかを確かめます。公開されていてはいけないファイル（.env など）が公開されていないかを、数回のアクセスで確かめます。攻撃やログインの試行は行いません。',
   activeOff: '現在、運営者の設定により、ファイルの公開状況を確かめる検査は行っていません。',
   validity: '確認できた状態は、最長 24 時間、このブラウザーでだけ有効です。',
   emailHeading: '方法 1：サイトと同じドメインのメールアドレスで確認する',
@@ -102,6 +104,17 @@ export const ownerText = {
   fixWindow: (until: string) =>
     `修正の確認は、所有者の確認が有効な間（${until} まで）に、このブラウザーでもう一度検査すると表示されます。有効期限を過ぎたあとは、所有者の確認からやり直すと検査できますが、今回の結果との比較は表示されません。`,
   fixPrivate: 'この文章には、問題の場所が書かれています。修正を依頼する AI コーディングツール以外には、共有しないでください。',
+  sourceHeading: 'URL から調べられない項目を、ソースコードで確認する',
+  sourceIntro: (total: number, count: number) =>
+    `この検査は、公開中のサイトを外側から見るものです。全 ${total} 項目のうち次の ${count} 項目は、外側からは調べられないか、URL 検査がまだ対応していません。上の表では「未検査」と表示されています。ソースコードがあれば、AI コーディングツール（Claude Code、Cursor など）で確認できます。`,
+  sourceSteps: [
+    'サイトを作ったプロジェクトを AI コーディングツールで開き、下の枠の文章をすべてコピーして貼り付けます（枠の中を押すと、全体が選択されます）。',
+    'AI が QA.JP.AI の「公開前チェック」を実行します。キーの混入やデータベースのアクセス制御など、ツールが根拠を確認できる問題は、ここで確定します。このツールが、コードを外部に送ることはありません。',
+    '続けて、AI がコードを読んで下の項目を確認し、「AI による確認」として報告します。',
+  ],
+  sourceNotOurResult:
+    '「AI による確認」は、AI がコードを読んで出した判断で、QA.JP.AI のツールの検査結果ではありません。このページの評価と検査範囲には反映されず、これらの項目は「未検査」のままです。',
+  sourceGuide: '公開前チェックの使い方',
 };
 
 function startPart(target: string): Html {
@@ -292,6 +305,25 @@ function fixRequestSection(assessment: Assessment, session: OwnerSession): Html 
 </section>`;
 }
 
+/**
+ * The next step for the rules a site check cannot examine. Which rules, and
+ * the text to paste, are the engine's. The text names rules only: nothing of
+ * this site's result is in it.
+ */
+function sourceReviewSection(ctx: PageContext, assessment: Assessment): Html | undefined {
+  const rules = sourceReviewRules(assessment);
+  if (rules.length === 0) return undefined;
+  return html`<section>
+<h2>${ownerText.sourceHeading}</h2>
+<p>${ownerText.sourceIntro(assessment.coverage.length, rules.length)}</p>
+<ul class="rules">${rules.map((u) => html`<li>${u.ruleId} ${ja.ruleTitle[u.ruleId]}</li>`)}</ul>
+<ol class="steps">${ownerText.sourceSteps.map((step) => html`<li>${step}</li>`)}</ol>
+<pre class="copy fixrequest sourcereview" tabindex="0">${renderSourceReview(assessment)}</pre>
+<p class="note">${ownerText.sourceNotOurResult}</p>
+<p><a href="${ctx.config.preReleaseGuideUrl}">${ownerText.sourceGuide}</a></p>
+</section>`;
+}
+
 function coverageDetail(unit: Assessment['coverage'][number]): string {
   if (unit.status === 'not_run' && unit.reason) return ja.notRunReasonLabel[unit.reason];
   if (unit.status === 'partial' && unit.note) return ja.coverageNoteLabel[unit.note];
@@ -319,6 +351,8 @@ export function ownerReportPage(
   const questions = assessment.records.filter(
     (r): r is Extract<AssessmentRecord, { verdict: 'needs_validation' }> => r.verdict === 'needs_validation',
   );
+  // Where this is shown it says everything the general pointer to the pre-release check would.
+  const sourceReview = sourceReviewSection(ctx, assessment);
   return layout(
     ctx,
     ownerText.reportHeading,
@@ -366,9 +400,10 @@ ${assessment.coverage.map(
 <p class="note">${t.disclaimer}</p>
 <p class="note">${t.rulesVersion}: v${assessment.rulesVersion}</p>
 </section>
+${sourceReview ?? ''}
 <form method="post" action="/owner/check"><button type="submit">${ownerText.checkAgain}</button></form>
 ${signOutForm()}
-${preReleaseBox(ctx)}`,
+${sourceReview ? '' : preReleaseBox(ctx)}`,
     { noindex: true },
   );
 }

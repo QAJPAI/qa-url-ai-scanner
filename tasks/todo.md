@@ -100,6 +100,32 @@ Still open for step 2:
         Chromium with the real engine against the engine's case site: first
         result, fix published, re-check shows the key as confirmed fixed.
 - [x] Engine dependency: `v0.11.0` (2026-11-24).
+- [x] Strengthening 5 and 6 (2026-11-24, engine 0.12.0).
+      - 5 is the engine's: the owner check reads the scripts that scripts
+        load. Here: the owner start page, the session page and the terms
+        (article 3) say so.
+      - 6: the owner result lists the rules a site check cannot examine and
+        shows the engine's request for a source review. The general pointer
+        to the pre-release check is dropped where this section is shown.
+      - 52 tests. Walked in Chromium with the real engine: a key in a chunk
+        that loads later is reported with the chunk as its place, the public
+        check requests only the page and its entry script, and after the key
+        is removed the re-check shows it as confirmed fixed.
+- [x] Strengthening 3/4, part A (2026-11-24, engine 0.12.0).
+      - The engine's: questions name the tables and public buckets the
+        site's code names. No change to pages or terms here, because no new
+        request is made. One test: the bucket question is shown with the
+        engine's wording, the name escaped, to the owner only.
+      - 53 tests. Walked in Chromium with the real engine against the case
+        site: the R01 question names `profiles`, an R06 question names
+        `id-cards`, no request goes to a storage or REST path, the public
+        check is unchanged, and the fixed site gets no bucket question.
+      - Part B (a read check with the owner's consent) is not started. It
+        waits for a lawyer's review of the boundary document.
+- [ ] Pin the engine to the tag `v0.12.0` once it exists (pinned to the
+      branch commit until then).
+- [ ] Terms, article 3: the sentence about reading scripts that scripts load
+      is new. Include it in the legal review before production.
 - [ ] MongoDB: `firstOwnerResult` has not run against a real MongoDB yet (the
       download of a test server is blocked in the build sandbox). Run
       `MONGODB_URI=… npm test` on the server.
