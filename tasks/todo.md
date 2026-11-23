@@ -104,10 +104,11 @@ Still open for step 2:
 - [ ] MongoDB: `firstOwnerResult` has not run against a real MongoDB yet (the
       download of a test server is blocked in the build sandbox). Run
       `MONGODB_URI=… npm test` on the server.
-- [ ] Open question: a fix often takes longer than the 24 hours a session
-      lasts. Keeping the first result longer would let a later session confirm
-      the fix, but owner details would then outlive the proof that allowed
-      them. Decide with the terms and privacy review.
+- [x] Decided (iQi, 2026-11-24): the comparison stays within the 24 hours a
+      session lasts. The longer the gap, the more the site may have changed
+      for other reasons, so a comparison with an old result says less; and
+      owner details never outlive the proof that allowed them. After 24 hours
+      the owner verifies again and starts from a fresh first check.
 
 ## Decided (2026-11-20)
 

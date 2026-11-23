@@ -40,7 +40,9 @@ layer only, so url.jp.ai and the engine's reports never disagree.
   (`compareAssessments()`), never by this layer: a key that is gone only
   because a script could not be read, or was swapped for another key, is not
   shown as fixed. The comparison lives as long as the session (24 hours at
-  most), because the first result is deleted with the proof.
+  most), because the first result is deleted with the proof. This is
+  deliberate: over a longer gap a site changes for other reasons too, and a
+  comparison with an old result would say less.
 
 The result page also points to QA.JP.AI's free pre-release check, for finding
 problems in the code before it is published.
