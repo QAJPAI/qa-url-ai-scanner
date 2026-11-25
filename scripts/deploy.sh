@@ -16,6 +16,7 @@ set -euo pipefail
 
 APP=url-jp-ai
 ng=0
+half_way="" # the version to put back if a deploy stops before pm2 is reloaded
 
 step() { printf '\n== %s\n' "$1"; }
 ok() { printf '  OK    %s\n' "$1"; }
@@ -47,19 +48,19 @@ pm2_app() {
 
 port_in_use() { (exec 3<>"/dev/tcp/127.0.0.1/$1") 2>/dev/null; }
 
-# The server's own rules for its settings (src/config.ts), applied to what pm2
-# would hand it. Asked before pm2 is touched: a typing mistake in the secrets
-# file must not replace a running server with one that cannot start.
-# Needs the installed packages, so it is skipped before the first install.
-# Prints what is wrong and fails; prints nothing when the settings are fine.
-settings_error() {
-  [ -d node_modules/tsx ] || return 0
-  node --import tsx -e '
-    Object.assign(process.env, require("./deploy/ecosystem.config.cjs").apps[0].env);
-    import("./src/config.ts")
-      .then(({ loadConfig }) => loadConfig())
-      .catch((err) => (console.log(err.message), process.exit(1)));' 2>&1
+# Could the server start with what pm2 would hand it? Asked before pm2 is
+# touched: a typing mistake in the secrets file, or a wrong database password,
+# must not replace a running server with one that cannot start. See
+# scripts/preflight.ts. It needs the installed packages, so it is skipped
+# before the first install (a deploy asks again after its own install), and
+# when rolling back to a version from before that file existed.
+# Prints what is wrong and fails; prints nothing when all is well.
+preflight() {
+  [ -d node_modules/tsx ] && [ -f scripts/preflight.ts ] || return 0
+  node --import tsx scripts/preflight.ts "$1" 2>&1
 }
+settings_error() { preflight settings; }
+database_error() { preflight database; }
 
 # Is this server ready? Changes nothing. Counts in $ng what would make a deploy
 # fail or be unsafe, and says what to do about each.
@@ -121,18 +122,25 @@ check() {
     ok "ポート $port（空いています）"
   fi
 
-  # The address only, never the whole setting: it may hold a password.
+  # Is something listening at the database's address? Shown and passed as the
+  # address only, never the whole setting: it may hold a password, and other
+  # users of the machine can read a command line.
   local mongo
   # shellcheck disable=SC2016 # the backticks and ${} below are JavaScript
-  if mongo="$(node -e '
-      const m = /^mongodb:\/\/(?:[^@\/]*@)?(\[[^\]]+\]|[^:\/,?]+)(?::(\d+))?/.exec(process.argv[1]);
+  if mongo="$(MONGODB_URI="$(conf MONGODB_URI)" node -e '
+      const m = /^mongodb:\/\/(?:[^@\/]*@)?(\[[^\]]+\]|[^:\/,?]+)(?::(\d+))?/.exec(process.env.MONGODB_URI);
       if (!m) process.exit(2);
       const host = m[1].replace(/^\[|\]$/g, ""), port = Number(m[2] || 27017);
       console.log(`${host}:${port}`);
       const socket = require("node:net").connect({ host, port, timeout: 3000 });
       socket.on("connect", () => process.exit(0)).on("timeout", () => process.exit(1)).on("error", () => process.exit(1));
-    ' "$(conf MONGODB_URI)")"; then
-    ok "MongoDB に接続できます（$mongo）"
+    ')"; then
+    # Listening is not enough: the server must also be let in.
+    if wrong="$(database_error)"; then
+      ok "MongoDB に接続できます（$mongo）"
+    else
+      bad "MongoDB（$mongo）は動いていますが、データベースを開けません: $wrong" "$secrets の MONGODB_URI（ユーザー名とパスワード）を確認してください"
+    fi
     local mongo_port="${mongo##*:}"
     case "$mongo" in
       127.0.0.1:* | localhost:* | ::1:*)
@@ -144,8 +152,12 @@ check() {
     esac
   elif [ -n "$mongo" ]; then
     bad "MongoDB に接続できません（$mongo）" "MongoDB が動いているか確認してください（例: sudo systemctl status mongod）"
+  elif ! wrong="$(database_error)"; then
+    bad "データベースを開けません: $wrong" "$secrets の MONGODB_URI を確認してください"
+  elif [ -d node_modules/tsx ] && [ -f scripts/preflight.ts ]; then
+    ok "MongoDB に接続できます"
   else
-    warn "MONGODB_URI の接続先は、ここでは確認していません" "起動後の動作確認の結果を見てください"
+    warn "MONGODB_URI の接続先は、まだ確認していません" "最初のデプロイのときに、起動の前に確認します"
   fi
 
   if command -v systemctl >/dev/null 2>&1 &&
@@ -212,10 +224,30 @@ restart() {
   exit 1
 }
 
+# The running process loaded its code when it started, but pm2 starts it again
+# from the files here after a crash or a reboot. So a deploy that stops half-way
+# (a failing test, a build error, a setting the new version refuses) must not
+# leave another version's files behind: the files of the running one are put back.
+# shellcheck disable=SC2317 # called by the EXIT trap in main()
+put_back() {
+  local running="$half_way"
+  [ -n "$running" ] || return 0
+  half_way=""
+  printf '\n== 動いている版（%s）のファイルに戻します\n' "$running" >&2
+  if git checkout --quiet --detach "$running" &&
+    npm ci --no-audit --no-fund --loglevel=error >&2 &&
+    npm run --silent build >&2; then
+    printf '  OK    戻しました。サーバーは %s のまま動いています\n' "$running" >&2
+  else
+    printf '  NG    戻せませんでした。もう一度実行してください: %s/scripts/deploy.sh %s\n' "$PWD" "$running" >&2
+  fi
+}
+
 # Everything runs inside main(): bash reads a script as it goes, and the
 # checkout below may replace this very file.
 main() {
   cd "$(dirname "$0")/.."
+  trap put_back EXIT
 
   case "${1:-}" in
     --check)
@@ -225,6 +257,10 @@ main() {
       ;;
     --reload)
       ready
+      if [ ! -f dist/server.mjs ]; then
+        echo "まだ一度もデプロイしていません。先にこちらを実行してください: $PWD/scripts/deploy.sh" >&2
+        exit 1
+      fi
       restart "$(conf PORT)" ""
       exit 0
       ;;
@@ -253,6 +289,8 @@ main() {
   git fetch --quiet --tags origin
   git checkout --quiet --detach "$ref"
   git log -1 --format='   %h %s（%cr）'
+  # From here until pm2 is reloaded, a stop puts the files of $previous back.
+  if [ "$(git rev-parse --short HEAD)" != "$previous" ]; then half_way="$previous"; fi
 
   step "インストール、テスト、ビルド（終わるまで、動いているサーバーには触れません）"
   npm ci --no-audit --no-fund --loglevel=error
@@ -268,11 +306,12 @@ main() {
   npm run --silent build
 
   local wrong
-  if ! wrong="$(settings_error)"; then
-    echo "この版では設定が通りません: $wrong （動いているサーバーには触れていません）" >&2
+  if ! wrong="$(settings_error)" || ! wrong="$(database_error)"; then
+    echo "この版は、いまの設定では起動できません: $wrong （動いているサーバーには触れていません）" >&2
     exit 1
   fi
 
+  half_way=""
   restart "$(conf PORT)" "$previous"
   local current
   current="$(git rev-parse --short HEAD)"
