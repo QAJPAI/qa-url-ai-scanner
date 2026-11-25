@@ -17,6 +17,7 @@ set -euo pipefail
 APP=url-jp-ai
 ng=0
 half_way="" # the version to put back if a deploy stops before pm2 is reloaded
+incomplete=0 # 1 when an interrupted install left the packages incomplete
 
 step() { printf '\n== %s\n' "$1"; }
 ok() { printf '  OK    %s\n' "$1"; }
@@ -32,8 +33,9 @@ conf() {
   node -p 'String(require("./deploy/ecosystem.config.cjs").apps[0].env[process.argv[1]] ?? "")' "$1"
 }
 
-# "<status> <restarts>" of our pm2 process, or nothing when pm2 has none.
-# pm2 may print notices around the JSON, so only the JSON line is read.
+# "<status> <restarts> <port> <path of the script it runs>" of our pm2 process,
+# or nothing when pm2 has none. pm2 may print notices around the JSON, so only
+# the JSON line is read.
 pm2_app() {
   pm2 jlist 2>/dev/null | APP="$APP" node -e '
     let text = "";
@@ -41,7 +43,8 @@ pm2_app() {
       const line = text.split("\n").find((l) => l.startsWith("[{") || l.trim() === "[]");
       try {
         const app = JSON.parse(line ?? "[]").find((a) => a.name === process.env.APP);
-        if (app) console.log(app.pm2_env.status, app.pm2_env.restart_time);
+        const env = app?.pm2_env;
+        if (env) console.log(env.status, env.restart_time, env.PORT ?? "-", env.pm_exec_path);
       } catch {}
     });' || true
 }
@@ -51,16 +54,27 @@ port_in_use() { (exec 3<>"/dev/tcp/127.0.0.1/$1") 2>/dev/null; }
 # Could the server start with what pm2 would hand it? Asked before pm2 is
 # touched: a typing mistake in the secrets file, or a wrong database password,
 # must not replace a running server with one that cannot start. See
-# scripts/preflight.ts. It needs the installed packages, so it is skipped
-# before the first install (a deploy asks again after its own install), and
-# when rolling back to a version from before that file existed.
-# Prints what is wrong and fails; prints nothing when all is well.
+# scripts/preflight.ts.
+#   0  it could, or it cannot be asked yet: nothing is installed before the
+#      first deploy (which asks again after its own install), and a version
+#      from before that file existed has no such check
+#   1  it could not; what is wrong is printed
+#   2  the question itself failed: the installed packages are incomplete (an
+#      install that was interrupted). A deploy installs them again.
+can_preflight() { [ -d node_modules/tsx ] && [ -f scripts/preflight.ts ]; }
 preflight() {
-  [ -d node_modules/tsx ] && [ -f scripts/preflight.ts ] || return 0
-  node --import tsx scripts/preflight.ts "$1" 2>&1
+  can_preflight || return 0
+  local out code=0
+  out="$(node --import tsx scripts/preflight.ts "$1" 2>&1)" || code=$?
+  case "$code" in
+    0) return 0 ;;
+    3)
+      printf '%s\n' "$out"
+      return 1
+      ;;
+    *) return 2 ;;
+  esac
 }
-settings_error() { preflight settings; }
-database_error() { preflight database; }
 
 # Is this server ready? Changes nothing. Counts in $ng what would make a deploy
 # fail or be unsafe, and says what to do about each.
@@ -88,9 +102,12 @@ check() {
   local secrets="${URL_JP_AI_SECRETS:-$HOME/.config/url-jp-ai/secrets.env}"
   if [ ! -f "$secrets" ]; then
     bad "秘密情報ファイルがありません: $secrets" "次の 1 行で作れます: mkdir -p \"$(dirname "$secrets")\" && (umask 077 && echo \"SESSION_SECRET=\$(openssl rand -base64 48)\" > \"$secrets\")"
+  elif [ ! -r "$secrets" ]; then
+    bad "秘密情報ファイルを読めません（持ち主が別のユーザーです）: $secrets" "sudo chown \"$(id -un)\" \"$secrets\""
+    return # every setting below is read through this file
   else
     local mode secret_length
-    mode="$(stat -c '%a' "$secrets" 2>/dev/null || echo 600)"
+    mode="$(stat -Lc '%a' "$secrets" 2>/dev/null || echo 600)"
     if [ "$mode" = "600" ] || [ "$mode" = "400" ]; then
       ok "秘密情報ファイル（本人だけが読めます）"
     else
@@ -104,17 +121,29 @@ check() {
     fi
   fi
 
-  # Only when nothing above failed, so that one mistake is reported once.
-  local wrong
-  if [ "$ng" -eq 0 ] && ! wrong="$(settings_error)"; then
-    bad "設定に誤りがあります: $wrong" "$secrets を直してください"
-    return # the port and the database address below come from these settings
+  # The server's own rules for its settings. Only when nothing above failed, so
+  # that one mistake is reported once. $asked: the database may be asked too.
+  local wrong code=0 asked=0
+  if [ "$ng" -eq 0 ]; then
+    wrong="$(preflight settings)" || code=$?
+    if [ "$code" -eq 1 ]; then
+      bad "設定に誤りがあります: $wrong" "$secrets を直してください"
+      return # the port and the database address below come from these settings
+    elif [ "$code" -eq 2 ]; then
+      incomplete=1
+      warn "前回のインストールが途中で止まっています" "$PWD/scripts/deploy.sh を実行すると、入れ直します"
+    elif can_preflight; then
+      asked=1
+    fi
   fi
 
-  local port status
+  # The port must be free, or held by the process this folder started.
+  local port status running_port running_path
   port="$(conf PORT)"
-  status="$(pm2_app | cut -d' ' -f1)"
-  if [ "$status" = "online" ]; then
+  read -r status _ running_port running_path <<<"$(pm2_app)" || true
+  if [ -n "$status" ] && [ "$running_path" != "$(pwd -P)/dist/server.mjs" ]; then
+    bad "pm2 に、別の場所から起動した $APP があります: $running_path" "それを使っていなければ pm2 delete $APP を実行してから、もう一度実行してください"
+  elif [ "$status" = "online" ] && [ "$running_port" = "$port" ]; then
     ok "ポート $port（url.jp.ai が稼働中）"
   elif port_in_use "$port"; then
     bad "ポート $port は別のプログラムが使っています" "$secrets に PORT=3100 のように空いている番号を書き、nginx の proxy_pass も同じ番号にしてください"
@@ -122,43 +151,43 @@ check() {
     ok "ポート $port（空いています）"
   fi
 
-  # Is something listening at the database's address? Shown and passed as the
-  # address only, never the whole setting: it may hold a password, and other
-  # users of the machine can read a command line.
-  local mongo
+  # The database. Shown and passed as the address only, never the whole
+  # setting: it may hold a password, and other users of the machine can read a
+  # command line. $reach: 0 something listens there, 1 nothing does, 2 the
+  # address could not be read from the setting (a name looked up by the driver).
+  local mongo reach=0
   # shellcheck disable=SC2016 # the backticks and ${} below are JavaScript
-  if mongo="$(MONGODB_URI="$(conf MONGODB_URI)" node -e '
-      const m = /^mongodb:\/\/(?:[^@\/]*@)?(\[[^\]]+\]|[^:\/,?]+)(?::(\d+))?/.exec(process.env.MONGODB_URI);
+  mongo="$(MONGODB_URI="$(conf MONGODB_URI)" node -e '
+      const m = /^mongodb:\/\/(?:[^\/?]*@)?(\[[^\]]+\]|[^:\/,?@]+)(?::(\d+))?/.exec(process.env.MONGODB_URI);
       if (!m) process.exit(2);
       const host = m[1].replace(/^\[|\]$/g, ""), port = Number(m[2] || 27017);
       console.log(`${host}:${port}`);
       const socket = require("node:net").connect({ host, port, timeout: 3000 });
       socket.on("connect", () => process.exit(0)).on("timeout", () => process.exit(1)).on("error", () => process.exit(1));
-    ')"; then
-    # Listening is not enough: the server must also be let in.
-    if wrong="$(database_error)"; then
-      ok "MongoDB に接続できます（$mongo）"
+    ')" || reach=$?
+  if [ "$asked" -eq 1 ]; then
+    # The server's own driver decides: listening is not enough, it must be let in.
+    if wrong="$(preflight database)"; then
+      ok "MongoDB に接続できます${mongo:+（$mongo）}"
     else
-      bad "MongoDB（$mongo）は動いていますが、データベースを開けません: $wrong" "$secrets の MONGODB_URI（ユーザー名とパスワード）を確認してください"
+      bad "データベースを開けません${mongo:+（$mongo）}: ${wrong:-確認を実行できませんでした}" "MongoDB が動いているか（例: sudo systemctl status mongod）と、$secrets の MONGODB_URI（ユーザー名とパスワード）を確認してください"
     fi
-    local mongo_port="${mongo##*:}"
-    case "$mongo" in
-      127.0.0.1:* | localhost:* | ::1:*)
-        if command -v ss >/dev/null 2>&1 &&
-          ss -ltnH 2>/dev/null | awk '{print $4}' | grep -Eq "^(0\.0\.0\.0|\*|\[::\]):${mongo_port}\$"; then
-          warn "MongoDB が外部からの接続も受け付ける設定です" "ファイアウォールでポート ${mongo_port} を閉じているか確認してください。閉じていなければ /etc/mongod.conf の bindIp を 127.0.0.1 にします"
-        fi
-        ;;
-    esac
-  elif [ -n "$mongo" ]; then
+  elif [ "$reach" -eq 0 ]; then
+    ok "MongoDB に接続できます（$mongo）"
+  elif [ "$reach" -eq 1 ]; then
     bad "MongoDB に接続できません（$mongo）" "MongoDB が動いているか確認してください（例: sudo systemctl status mongod）"
-  elif ! wrong="$(database_error)"; then
-    bad "データベースを開けません: $wrong" "$secrets の MONGODB_URI を確認してください"
-  elif [ -d node_modules/tsx ] && [ -f scripts/preflight.ts ]; then
-    ok "MongoDB に接続できます"
   else
-    warn "MONGODB_URI の接続先は、まだ確認していません" "最初のデプロイのときに、起動の前に確認します"
+    warn "MONGODB_URI の接続先は、まだ確認していません" "デプロイのときに、起動の前に確認します"
   fi
+  local mongo_port="${mongo##*:}"
+  case "$mongo" in
+    127.0.0.1:* | localhost:* | ::1:*)
+      if command -v ss >/dev/null 2>&1 &&
+        ss -ltnH 2>/dev/null | awk '{print $4}' | grep -Eq "^(0\.0\.0\.0|\*|\[::\]):${mongo_port}\$"; then
+        warn "MongoDB が外部からの接続も受け付ける設定です" "ファイアウォールでポート ${mongo_port} を閉じているか確認してください。閉じていなければ /etc/mongod.conf の bindIp を 127.0.0.1 にします"
+      fi
+      ;;
+  esac
 
   if command -v systemctl >/dev/null 2>&1 &&
     [ "$(systemctl is-enabled "pm2-$(id -un).service" 2>/dev/null || true)" != "enabled" ]; then
@@ -235,7 +264,7 @@ put_back() {
   half_way=""
   printf '\n== 動いている版（%s）のファイルに戻します\n' "$running" >&2
   if git checkout --quiet --detach "$running" &&
-    npm ci --no-audit --no-fund --loglevel=error >&2 &&
+    npm ci --include=dev --no-audit --no-fund --loglevel=error >&2 &&
     npm run --silent build >&2; then
     printf '  OK    戻しました。サーバーは %s のまま動いています\n' "$running" >&2
   else
@@ -257,8 +286,8 @@ main() {
       ;;
     --reload)
       ready
-      if [ ! -f dist/server.mjs ]; then
-        echo "まだ一度もデプロイしていません。先にこちらを実行してください: $PWD/scripts/deploy.sh" >&2
+      if [ ! -f dist/server.mjs ] || [ "$incomplete" -eq 1 ]; then
+        echo "この状態では再読み込みできません（まだデプロイしていないか、インストールが途中です）。先にこちらを実行してください: $PWD/scripts/deploy.sh" >&2
         exit 1
       fi
       restart "$(conf PORT)" ""
@@ -293,23 +322,25 @@ main() {
   if [ "$(git rev-parse --short HEAD)" != "$previous" ]; then half_way="$previous"; fi
 
   step "インストール、テスト、ビルド（終わるまで、動いているサーバーには触れません）"
-  npm ci --no-audit --no-fund --loglevel=error
+  npm ci --include=dev --no-audit --no-fund --loglevel=error
   local log
   log="$(mktemp -t url-jp-ai-test.XXXXXX)"
   if ! npm test >"$log" 2>&1; then
-    grep -E '^not ok|^# (tests|pass|fail)' "$log" >&2 || true
+    grep -E '^(not ok|✖) |^(#|ℹ) (tests|pass|fail) ' "$log" >&2 || true
     echo "テストが失敗しました。動いているサーバーには触れていません。全文: $log" >&2
     exit 1
   fi
-  printf '   テスト: %s 件すべて通過\n' "$(sed -n 's/^# pass //p' "$log")"
+  printf '   テスト: %s 件すべて通過\n' "$(sed -n -E 's/^(#|ℹ) pass //p' "$log")"
   rm -f "$log"
   npm run --silent build
 
   local wrong
-  if ! wrong="$(settings_error)" || ! wrong="$(database_error)"; then
+  if ! wrong="$(preflight settings)" || ! wrong="$(preflight database)"; then
     {
-      echo "この版は、いまの設定では起動できません: $wrong"
-      echo "動いているサーバーには触れていません。どこを直すかは、こちらで確認できます: $PWD/scripts/deploy.sh --check"
+      echo "この版は、いまの設定では起動できません: ${wrong:-起動前の確認を実行できませんでした}"
+      echo "動いているサーバーには触れていません。"
+      # After the files are put back, --check would ask the old version instead.
+      if [ -z "$half_way" ]; then echo "どこを直すかは、こちらで確認できます: $PWD/scripts/deploy.sh --check"; fi
     } >&2
     exit 1
   fi

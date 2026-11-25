@@ -9,7 +9,9 @@
 //   node --import tsx scripts/preflight.ts database   and can it open its database?
 //
 // Reads only: nothing is created or changed, in the database either. Prints
-// what is wrong and exits 1; prints nothing when all is well.
+// what is wrong and exits 3; prints nothing when all is well. Any other exit
+// code means the question itself failed (packages missing after an interrupted
+// install), which deploy.sh must not report as a wrong setting.
 import { createRequire } from 'node:module';
 import { MongoClient } from 'mongodb';
 import { loadConfig } from '../src/config';
@@ -33,5 +35,5 @@ try {
   // The message only, and never an address with its password.
   const message = err instanceof Error ? err.message : String(err);
   console.log(message.replace(/\/\/[^@\s/]*@/g, '//***@'));
-  process.exit(1);
+  process.exit(3);
 }

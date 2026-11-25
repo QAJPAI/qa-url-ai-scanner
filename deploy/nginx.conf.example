@@ -1,13 +1,18 @@
 # nginx in front of url.jp.ai. Works as it is on nginx 1.18 and later.
 #
 # Before enabling it:
-# - The certificate files below must exist (e.g. certbot), or `nginx -t` fails.
+# - The certificate files below must exist, or `nginx -t` fails. Get them first:
+#     sudo certbot certonly --nginx -d url.jp.ai --deploy-hook "systemctl reload nginx"
+#   `certonly`: plain `certbot --nginx` would write a second url.jp.ai server
+#   into the default site, and nginx would then ignore one of the two.
 # - 3000 in proxy_pass (twice) must be the PORT the app listens on.
 # - On a server without IPv6, delete the two `listen [::]` lines.
 # - If a CDN or another proxy stands in front of nginx (Cloudflare's proxy, a
 #   load balancer), $remote_addr is that proxy's address: every visitor would
 #   share one rate limit and the audit log would name the proxy. Point the DNS
 #   name straight at this server, or set up nginx's realip module first.
+# - With SELinux enforcing (RHEL, AlmaLinux, Rocky), nginx may not connect to
+#   the app until: sudo setsebool -P httpd_can_network_connect 1
 #
 # The app listens on 127.0.0.1 and trusts X-Real-IP only from this machine.
 

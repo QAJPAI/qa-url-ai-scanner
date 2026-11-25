@@ -476,6 +476,11 @@ test('owner paths accept only their methods', async () => {
 test('settings: the session secret, the switch, and secure cookie names', () => {
   assert.throws(() => loadConfig({ SESSION_SECRET: 'short' }), /at least 32/);
   assert.throws(() => loadConfig({ NODE_ENV: 'production', BASE_URL: 'https://url.jp.ai' }), /SESSION_SECRET/);
+  assert.throws(
+    () => loadConfig({ NODE_ENV: 'production', BASE_URL: 'https://url.jp.ai', SESSION_SECRET: 's'.repeat(32) }),
+    /MONGODB_URI/,
+    'production keeps nothing in memory only',
+  );
   assert.throws(() => loadConfig({ ACTIVE_CHECKS: 'maybe' }), /on or off/);
   assert.equal(loadConfig({}).activeChecks, true);
   assert.equal(loadConfig({}).sessionSecret.length >= 32, true, 'a development secret is made up');
