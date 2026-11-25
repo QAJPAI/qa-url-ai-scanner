@@ -72,23 +72,21 @@ check() {
 
   local secrets="${URL_JP_AI_SECRETS:-$HOME/.config/url-jp-ai/secrets.env}"
   if [ ! -f "$secrets" ]; then
-    bad "秘密情報ファイルがありません: $secrets" "公開手順の「初回セットアップ」のコマンドで作ってください"
+    bad "秘密情報ファイルがありません: $secrets" "次の 1 行で作れます: mkdir -p \"$(dirname "$secrets")\" && (umask 077 && echo \"SESSION_SECRET=\$(openssl rand -base64 48)\" > \"$secrets\")"
   else
-    local mode
+    local mode secret_length
     mode="$(stat -c '%a' "$secrets" 2>/dev/null || echo 600)"
     if [ "$mode" = "600" ] || [ "$mode" = "400" ]; then
       ok "秘密情報ファイル（本人だけが読めます）"
     else
-      bad "秘密情報ファイルをほかのユーザーが読めます（権限 $mode）" "chmod 600 $secrets"
+      bad "秘密情報ファイルをほかのユーザーが読めます（権限 $mode）" "chmod 600 \"$secrets\""
     fi
-  fi
-
-  local secret_length
-  secret_length="$(conf SESSION_SECRET | tr -d '\n' | wc -c)"
-  if [ "$secret_length" -ge 32 ]; then
-    ok "SESSION_SECRET（${secret_length} 文字）"
-  else
-    bad "SESSION_SECRET がないか、32 文字未満です" "echo \"SESSION_SECRET=\$(openssl rand -base64 48)\" >> $secrets"
+    secret_length="$(conf SESSION_SECRET | tr -d '\n' | wc -c)"
+    if [ "$secret_length" -ge 32 ]; then
+      ok "SESSION_SECRET（${secret_length} 文字）"
+    else
+      bad "SESSION_SECRET がないか、32 文字未満です" "echo \"SESSION_SECRET=\$(openssl rand -base64 48)\" >> \"$secrets\""
+    fi
   fi
 
   local port status
