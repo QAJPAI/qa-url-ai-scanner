@@ -23,6 +23,12 @@ const pm2 = createRequire(import.meta.url)('../deploy/ecosystem.config.cjs') as 
 try {
   const config = loadConfig({ ...process.env, ...pm2.apps[0].env });
   if (process.argv[2] === 'database' && config.mongoUri) {
+    // The driver would take what follows an unescaped @ for the host name and
+    // name it in its error: a piece of the password, on the operator's screen.
+    const beforePath = /^mongodb(?:\+srv)?:\/\/([^/?]*)/.exec(config.mongoUri)?.[1] ?? '';
+    if (beforePath.split('@').length > 2) {
+      throw new Error('MONGODB_URI: in the user name and password, write @ as %40 (and : / ? as %3A %2F %3F)');
+    }
     const client = new MongoClient(config.mongoUri, { serverSelectionTimeoutMS: 5000 });
     try {
       // Listing needs a signed-in user wherever the database asks for one; a ping does not.
