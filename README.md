@@ -84,19 +84,32 @@ echo "SESSION_SECRET=$(openssl rand -base64 48)" >> ~/.config/url-jp-ai/secrets.
 # add RESEND_API_KEY=... when the url.jp.ai domain is verified at Resend
 ```
 
-Every deploy (and every roll-back, with an older tag or commit):
+Then, from anywhere:
 
 ```sh
-~/url-jp-ai/scripts/deploy.sh            # latest main
-~/url-jp-ai/scripts/deploy.sh <tag>      # a specific version
+~/url-jp-ai/scripts/deploy.sh --check    # is this server ready? changes nothing
+~/url-jp-ai/scripts/deploy.sh            # deploy the latest main
+~/url-jp-ai/scripts/deploy.sh <commit>   # deploy a tag or commit (how to roll back)
+~/url-jp-ai/scripts/deploy.sh --reload   # apply a changed secrets.env; same code
 ```
 
-It checks out the version, runs `npm ci`, the tests and the build, and only
-then reloads pm2 and checks that the server answers. A failure at any step
-leaves the running server untouched. `deploy/ecosystem.config.cjs` holds no
-secrets: they come from `~/.config/url-jp-ai/secrets.env` (or the file named by
-`URL_JP_AI_SECRETS`), so nothing on the server needs editing inside the
-repository.
+Every run starts with the checks of `--check`: Node.js 22, the secrets file and
+its permissions, `SESSION_SECRET`, that the port is free or ours, that MongoDB
+answers. It stops there, having changed nothing, if one fails, and says what
+to do. A deploy then checks out the version, runs `npm ci`, the tests and the
+build, and only after all of that reloads pm2. It then makes sure that it is
+this process that answers on `/healthz` and that it stays up: a port held by
+another program also answers, and a process that crashes every second looks
+"online" each time pm2 is asked. On failure it prints the last log lines and
+the command that returns to the version before. What the script prints is
+Japanese, like everything else an operator or visitor reads.
+
+`deploy/ecosystem.config.cjs` holds no secrets. They come from
+`~/.config/url-jp-ai/secrets.env` (or the file named by `URL_JP_AI_SECRETS`),
+whose values override the defaults in that file, so nothing on the server
+needs editing inside the repository. Server-specific settings go there too:
+`PORT=3100` when 3000 is taken, `SITE_BETA=off` to end the beta,
+`ACTIVE_CHECKS=off` to stop active checks at once (then `deploy.sh --reload`).
 
 nginx in front: see [deploy/nginx.conf.example](deploy/nginx.conf.example).
 Without `MONGODB_URI` the server keeps everything in memory (development only;
@@ -131,9 +144,9 @@ MONGODB_URI=mongodb://127.0.0.1:27017 npm test
 
 - The terms and privacy policy are drafts; have them reviewed by a lawyer.
 - Run the MongoDB store tests against the server's MongoDB
-  (`MONGODB_URI=… npm test`). They include the lookup that the re-check
-  comparison uses (`firstOwnerResult`), which has only run against the
-  in-memory store so far.
+  (`MONGODB_URI=… npm test`). They pass against MongoDB 8.0 (2026-11-26),
+  including the lookup that the re-check comparison uses
+  (`firstOwnerResult`); the server's own version has not been tried.
 
 ## Licence
 
