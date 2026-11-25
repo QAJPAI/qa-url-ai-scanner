@@ -187,7 +187,9 @@ iQi asked for the procedure to be reviewed again and rewritten. The first one
   fails during install, test or build.
 - MongoDB store tests: 50 of 50 against 4.4.30, 6.0.28, 7.0.48 and 8.0; the
   app starts in production mode on 4.4. PR #3's branch: 54 of 54 on 8.0.
-  This closes "firstOwnerResult has not run against a real MongoDB".
+  This answers the open box "firstOwnerResult has not run against a real
+  MongoDB" in step 3. The box itself is ticked after PR #3 merges: that PR
+  edits the lines next to it, and changing it here would make the two conflict.
 - The store test's fixed past date let MongoDB's TTL monitor delete a
   document mid-test: 4 of 85 runs failed with the monitor at 1 second, none
   of 60 after moving the date into the future. At the default 60 seconds it
