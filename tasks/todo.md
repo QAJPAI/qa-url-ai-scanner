@@ -126,9 +126,10 @@ Still open for step 2:
       branch commit until then).
 - [ ] Terms, article 3: the sentence about reading scripts that scripts load
       is new. Include it in the legal review before production.
-- [ ] MongoDB: `firstOwnerResult` has not run against a real MongoDB yet (the
-      download of a test server is blocked in the build sandbox). Run
-      `MONGODB_URI=… npm test` on the server.
+- [x] MongoDB: `firstOwnerResult` against a real MongoDB (2026-11-26). Not
+      run in this branch's sandbox, where the test server's download is
+      blocked. Run by the launch-plan work on this branch's code: 54 of 54
+      pass on MongoDB 8.0, store tests also on 4.4, 6.0 and 7.0.
 - [x] Decided (iQi, 2026-11-24): the comparison stays within the 24 hours a
       session lasts. The longer the gap, the more the site may have changed
       for other reasons, so a comparison with an old result says less; and
