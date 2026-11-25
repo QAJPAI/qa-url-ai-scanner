@@ -59,9 +59,13 @@ check mark, which would read as "certified").
 Still open for step 1:
 - [x] Engine dependency: `github:QAJPAI/qa-jp-ai-scanner#v0.8.0` (2026-11-20).
       A clean `npm ci` with SSH blocked installs and builds it over HTTPS.
-- [ ] Run the MongoDB store tests on the server (`MONGODB_URI=… npm test`).
+- [x] The MongoDB store tests against a real MongoDB: 4.4, 6.0, 7.0 and 8.0
+      (2026-11-26, see the review below). Running them once on the server's
+      own MongoDB stays in the launch procedure, as a confirmation.
 - [ ] Deploy behind nginx. Deploy from git with `scripts/deploy.sh`; secrets in
       `~/.config/url-jp-ai/secrets.env`, not in the repository (2026-11-22).
+      Production is not built yet (iQi, 2026-11-24): first the basics, then
+      the server. The procedure was rehearsed on a clean machine (2026-11-26).
 - [x] Operator in the terms and privacy policy: Agentic AI LLC (iQi, 2026-11-20).
 
 ## Step 2: owner results
@@ -157,3 +161,44 @@ Still open for step 2:
   nothing and was removed.
 - Not verified here: sending through Resend (no key), the MongoDB store against
   a real MongoDB, and active checks against a real site.
+
+## Review (2026-11-26, the launch procedure)
+
+iQi asked for the procedure to be reviewed again and rewritten. The first one
+(2026-11-22) had been written from reading the files; this time it was run.
+
+- Rehearsed start to finish on a clean Ubuntu 24.04 as an unprivileged user:
+  nginx 1.24 from apt, pm2 7, MongoDB 8.0, a self-signed certificate in the
+  place of certbot's. `npm ci` fetched the engine over HTTPS with no SSH key
+  and no URL rewriting. Through nginx, in production mode: the pages, the
+  check form (same-origin behind the proxy), the `__Host-` cookie, the audit
+  entry and the TTL indexes in MongoDB.
+- Found by running it, and fixed (see the commit of the same date):
+  - `deploy/nginx.conf.example` did not pass `nginx -t` on Ubuntu 24.04's
+    nginx (`http2 on;` needs 1.25.1). Now passes on 1.18, 1.24, 1.26, 1.29.
+  - With the port held by another program, `deploy.sh` reported OK while pm2
+    restarted the app in a loop. The health check asked "does something
+    answer", not "does our process answer".
+  - A mistake in the secrets file took the running server down on reload.
+    The settings are now loaded with `src/config.ts` before pm2 is touched.
+  - The health check read the port from the shell, not from pm2's settings.
+- Measured: a deploy makes nginx answer 502 for about 0.4 seconds, at the
+  moment pm2 swaps the process (6 of 254 requests at 20 a second). Nothing
+  fails during install, test or build.
+- MongoDB store tests: 50 of 50 against 4.4.30, 6.0.28, 7.0.48 and 8.0; the
+  app starts in production mode on 4.4. PR #3's branch: 54 of 54 on 8.0.
+  This closes "firstOwnerResult has not run against a real MongoDB".
+- The store test's fixed past date let MongoDB's TTL monitor delete a
+  document mid-test: 4 of 85 runs failed with the monitor at 1 second, none
+  of 60 after moving the date into the future. At the default 60 seconds it
+  would have been about one run in a thousand.
+- What url.jp.ai will say about itself, from the engine against this nginx
+  setup with stand-in DNS answers: grade A when jp.ai (the domain whose mail
+  settings apply to url.jp.ai) has SPF and DMARC `p=quarantine` or `reject`;
+  B with `p=none` or without SPF; D without DMARC. Nothing else is reported.
+- Found outside this repository: the engine's tag `v0.12.0` points at the
+  commit of `v0.11.0` (it was made before engine PR #2 was merged). PR #3
+  here must not be pinned to it until the tag is moved.
+- Not verified here: a real check of a site on the internet (the build
+  sandbox has no outbound network for the engine), certbot, Resend, DNS for
+  url.jp.ai, pm2's start at boot, and the server's own versions.

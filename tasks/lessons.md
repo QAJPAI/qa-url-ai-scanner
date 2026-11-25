@@ -45,3 +45,11 @@ posts; the tests set `Origin` themselves.
 ## Commands for the user must not assume the state of their machine (2026-11-24)
 - I gave `git checkout main && git pull && git tag … && git push origin …` to tag a release. The owner's local `main` had one unpushed commit, so `git pull` stopped on divergent branches. The `&&` chain kept anything wrong from happening, but the tag was not made.
 - Rule: when a command only needs what is on GitHub, name it directly (`git fetch origin && git tag vX.Y.Z origin/main && git push origin vX.Y.Z`) and leave local branches alone. Never route a release step through `git pull` on a machine I cannot see. Keep chaining with `&&` so a failed step stops the rest.
+
+## A procedure nobody has run is a draft (2026-11-26)
+- The first server procedure (2026-11-22) was written from reading the files. The owner found it hard to follow and asked for a second review. Run on a clean machine, it failed at `nginx -t` on Ubuntu 24.04's stock nginx, and `deploy.sh` could print OK while the app was crash-looping, because another program answered on the port.
+- Rule: before handing over a procedure, run every command of it on a clean machine as an unprivileged user, and write down what could not be run there (certbot, DNS, mail) as "not verified".
+- Rule: a health check must prove identity and stability, not reachability: ask the app's own endpoint, and require the process manager to report the same process, still up, a few seconds later.
+- Rule: validate settings with the program's own rules before restarting it. A typing mistake must fail the command, not the running service.
+- Rule: check the facts a step depends on rather than the user's report of them ("the tag is made"): `v0.12.0` existed but pointed at the commit of `v0.11.0`.
+
