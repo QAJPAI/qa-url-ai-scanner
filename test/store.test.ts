@@ -32,7 +32,11 @@ for (const [name, open, cleanUp] of stores) {
   test(`${name} store: results, reuse, windows, audit`, async () => {
     const store = await open();
     try {
-      const t0 = new Date('2026-11-20T00:00:00Z');
+      // A midnight in the future, not a fixed date: MongoDB removes documents
+      // whose `expiresAt` has passed by its own clock, about once a minute, so
+      // with a past date a run could lose a document between saving and reading it.
+      const DAY = 86_400_000;
+      const t0 = new Date((Math.floor(Date.now() / DAY) + 2) * DAY);
       const later = (ms: number) => new Date(t0.getTime() + ms);
       const result = (id: string, target: string, at: Date) => ({
         id,

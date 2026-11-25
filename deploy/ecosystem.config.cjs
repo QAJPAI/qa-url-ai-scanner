@@ -18,6 +18,33 @@ const secretsFile =
 // production without SESSION_SECRET, which says plainly what is missing.
 const secrets = fs.existsSync(secretsFile) ? parseEnv(fs.readFileSync(secretsFile, 'utf8')) : {};
 
+// pm2 keeps a setting it was once given, even after its line is deleted from
+// the secrets file. So every setting that has no value below starts out empty,
+// which the server reads as "not set": deleting a line takes effect on the
+// next reload. test/deploy.test.ts keeps this list in step with src/config.ts.
+const unset = Object.fromEntries(
+  [
+    'SESSION_SECRET',
+    'RESEND_API_KEY',
+    'LIMIT_PER_IP_PER_MINUTE',
+    'LIMIT_PER_IP_PER_DAY',
+    'LIMIT_TOTAL_PER_DAY',
+    'REUSE_RESULT_MINUTES',
+    'RESULT_TTL_DAYS',
+    'AUDIT_TTL_DAYS',
+    'MAX_CONCURRENT_SCANS',
+    'MAX_QUEUED_SCANS',
+    'SCAN_BUDGET_SECONDS',
+    'MAIL_PER_ADDRESS_PER_DAY',
+    'MAIL_PER_SITE_PER_DAY',
+    'MAIL_PER_IP_PER_DAY',
+    'MAIL_TOTAL_PER_DAY',
+    'VERIFY_PER_IP_PER_MINUTE',
+    'OWNER_CHECKS_PER_HOUR',
+    'LOGIN_LINK_MINUTES',
+  ].map((name) => [name, '']),
+);
+
 module.exports = {
   apps: [
     {
@@ -29,6 +56,7 @@ module.exports = {
       exec_mode: 'fork',
       max_memory_restart: '512M',
       env: {
+        ...unset,
         NODE_ENV: 'production',
         HOST: '127.0.0.1',
         PORT: '3000',

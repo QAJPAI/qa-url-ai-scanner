@@ -3,50 +3,358 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 #
 # Deploy url.jp.ai on the server from git. Run it from anywhere:
-#   ~/url-jp-ai/scripts/deploy.sh            # latest main
-#   ~/url-jp-ai/scripts/deploy.sh v0.2.0     # a tag or commit (also how to roll back)
+#   ~/url-jp-ai/scripts/deploy.sh --check    # check this server; changes nothing
+#   ~/url-jp-ai/scripts/deploy.sh            # deploy the latest main
+#   ~/url-jp-ai/scripts/deploy.sh <commit>   # deploy a tag or commit (how to roll back)
+#   ~/url-jp-ai/scripts/deploy.sh --reload   # apply a changed secrets.env; same code
 #
-# Stops at the first failure, before pm2 is touched, so a broken build or a
-# failing test never replaces the running server.
+# Every run starts with the checks of --check and stops there if the server is
+# not ready. A deploy then installs, tests and builds, and only after all of
+# that touches pm2, so a broken build or a failing test never replaces the
+# running server. What the operator reads is Japanese.
 set -euo pipefail
+
+APP=url-jp-ai
+ng=0
+half_way="" # the version to put back if a deploy stops before pm2 is reloaded
+incomplete=0 # 1 when an interrupted install left the packages incomplete
+
+step() { printf '\n== %s\n' "$1"; }
+ok() { printf '  OK    %s\n' "$1"; }
+warn() { printf '  注意  %s\n        → %s\n' "$1" "$2"; }
+bad() {
+  printf '  NG    %s\n        → %s\n' "$1" "$2"
+  ng=$((ng + 1))
+}
+
+# One setting as pm2 will see it: the defaults in deploy/ecosystem.config.cjs,
+# overridden by the secrets file.
+conf() {
+  node -p 'String(require("./deploy/ecosystem.config.cjs").apps[0].env[process.argv[1]] ?? "")' "$1"
+}
+
+# "<status> <restarts> <port> <path of the script it runs>" of our pm2 process,
+# or nothing when pm2 has none. pm2 may print notices around the JSON, so only
+# the JSON line is read.
+pm2_app() {
+  pm2 jlist 2>/dev/null | APP="$APP" node -e '
+    let text = "";
+    process.stdin.on("data", (d) => (text += d)).on("end", () => {
+      const line = text.split("\n").find((l) => l.startsWith("[{") || l.trim() === "[]");
+      try {
+        const app = JSON.parse(line ?? "[]").find((a) => a.name === process.env.APP);
+        const env = app?.pm2_env;
+        if (env) console.log(env.status, env.restart_time, env.PORT ?? "-", env.pm_exec_path);
+      } catch {}
+    });' || true
+}
+
+port_in_use() { (exec 3<>"/dev/tcp/127.0.0.1/$1") 2>/dev/null; }
+
+# Could the server start with what pm2 would hand it? Asked before pm2 is
+# touched: a typing mistake in the secrets file, or a wrong database password,
+# must not replace a running server with one that cannot start. See
+# scripts/preflight.ts.
+#   0  it could, or it cannot be asked yet: nothing is installed before the
+#      first deploy (which asks again after its own install), and a version
+#      from before that file existed has no such check
+#   1  it could not; what is wrong is printed
+#   2  the question itself failed: the installed packages are incomplete (an
+#      install that was interrupted). A deploy installs them again.
+can_preflight() { [ -d node_modules/tsx ] && [ -f scripts/preflight.ts ]; }
+preflight() {
+  can_preflight || return 0
+  local out code=0
+  out="$(node --import tsx scripts/preflight.ts "$1" 2>&1)" || code=$?
+  case "$code" in
+    0) return 0 ;;
+    3)
+      printf '%s\n' "$out"
+      return 1
+      ;;
+    *) return 2 ;;
+  esac
+}
+
+# Is this server ready? Changes nothing. Counts in $ng what would make a deploy
+# fail or be unsafe, and says what to do about each.
+check() {
+
+  local missing=0 cmd
+  for cmd in git node npm pm2 curl; do
+    if ! command -v "$cmd" >/dev/null 2>&1; then
+      bad "$cmd が見つかりません" "$cmd をインストールしてください（pm2 は: npm install -g pm2）"
+      missing=1
+    fi
+  done
+  if ! command -v node >/dev/null 2>&1; then return; fi
+
+  local node_major
+  node_major="$(node -p 'process.versions.node.split(".")[0]')"
+  if [ "$node_major" -ge 22 ]; then
+    ok "Node.js $(node -v)"
+  else
+    bad "Node.js $(node -v) は古すぎます（22 以上が必要）" "Node.js 22 以上を入れてください。pm2 もその Node.js で動かします"
+    return # the settings below are read with Node 22's parser
+  fi
+  if [ "$missing" -eq 0 ]; then ok "git, npm, pm2, curl"; fi
+
+  local secrets="${URL_JP_AI_SECRETS:-$HOME/.config/url-jp-ai/secrets.env}"
+  if [ ! -f "$secrets" ]; then
+    bad "秘密情報ファイルがありません: $secrets" "次の 1 行で作れます: mkdir -p \"$(dirname "$secrets")\" && (umask 077 && echo \"SESSION_SECRET=\$(openssl rand -base64 48)\" > \"$secrets\")"
+  elif [ ! -r "$secrets" ]; then
+    bad "秘密情報ファイルを読めません（持ち主が別のユーザーです）: $secrets" "sudo chown \"$(id -un)\" \"$secrets\""
+    return # every setting below is read through this file
+  else
+    local mode secret_length
+    mode="$(stat -Lc '%a' "$secrets" 2>/dev/null || echo 600)"
+    if [ "$mode" = "600" ] || [ "$mode" = "400" ]; then
+      ok "秘密情報ファイル（本人だけが読めます）"
+    else
+      bad "秘密情報ファイルをほかのユーザーが読めます（権限 $mode）" "chmod 600 \"$secrets\""
+    fi
+    secret_length="$(conf SESSION_SECRET | tr -d '\n' | wc -c)"
+    if [ "$secret_length" -ge 32 ]; then
+      ok "SESSION_SECRET（${secret_length} 文字）"
+    else
+      bad "SESSION_SECRET がないか、32 文字未満です" "echo \"SESSION_SECRET=\$(openssl rand -base64 48)\" >> \"$secrets\""
+    fi
+  fi
+
+  # The server's own rules for its settings. Only when nothing above failed, so
+  # that one mistake is reported once. $asked: the database may be asked too.
+  local wrong code=0 asked=0
+  if [ "$ng" -eq 0 ]; then
+    wrong="$(preflight settings)" || code=$?
+    if [ "$code" -eq 1 ]; then
+      bad "設定に誤りがあります: $wrong" "$secrets を直してください"
+      return # the port and the database address below come from these settings
+    elif [ "$code" -eq 2 ]; then
+      incomplete=1
+      warn "前回のインストールが途中で止まっています" "$PWD/scripts/deploy.sh を実行すると、入れ直します"
+    elif can_preflight; then
+      asked=1
+    fi
+  fi
+
+  # The port must be free, or held by the process this folder started.
+  local port status running_port running_path
+  port="$(conf PORT)"
+  read -r status _ running_port running_path <<<"$(pm2_app)" || true
+  if [ -n "$status" ] && [ "$running_path" != "$(pwd -P)/dist/server.mjs" ]; then
+    bad "pm2 に、別の場所から起動した $APP があります: $running_path" "それを使っていなければ pm2 delete $APP を実行してから、もう一度実行してください"
+  elif [ "$status" = "online" ] && [ "$running_port" = "$port" ]; then
+    ok "ポート $port（url.jp.ai が稼働中）"
+  elif port_in_use "$port"; then
+    bad "ポート $port は別のプログラムが使っています" "$secrets に PORT=3100 のように空いている番号を書き、nginx の proxy_pass も同じ番号にしてください"
+  else
+    ok "ポート $port（空いています）"
+  fi
+
+  # The database. Shown and passed as the address only, never the whole
+  # setting: it may hold a password, and other users of the machine can read a
+  # command line. $reach: 0 something listens there, 1 nothing does, 2 the
+  # address could not be read from the setting (a name looked up by the driver).
+  local mongo reach=0
+  # shellcheck disable=SC2016 # the backticks and ${} below are JavaScript
+  mongo="$(MONGODB_URI="$(conf MONGODB_URI)" node -e '
+      const m = /^mongodb:\/\/(?:[^\/?]*@)?(\[[^\]]+\]|[^:\/,?@]+)(?::(\d+))?/.exec(process.env.MONGODB_URI);
+      if (!m) process.exit(2);
+      const host = m[1].replace(/^\[|\]$/g, ""), port = Number(m[2] || 27017);
+      console.log(`${host}:${port}`);
+      const socket = require("node:net").connect({ host, port, timeout: 3000 });
+      socket.on("connect", () => process.exit(0)).on("timeout", () => process.exit(1)).on("error", () => process.exit(1));
+    ')" || reach=$?
+  if [ "$asked" -eq 1 ]; then
+    # The server's own driver decides: listening is not enough, it must be let in.
+    if wrong="$(preflight database)"; then
+      ok "MongoDB に接続できます${mongo:+（$mongo）}"
+    else
+      bad "データベースを開けません${mongo:+（$mongo）}: ${wrong:-確認を実行できませんでした}" "MongoDB が動いているか（例: sudo systemctl status mongod）と、$secrets の MONGODB_URI（ユーザー名とパスワード）を確認してください"
+    fi
+  elif [ "$reach" -eq 0 ]; then
+    ok "MongoDB に接続できます（$mongo）"
+  elif [ "$reach" -eq 1 ]; then
+    bad "MongoDB に接続できません（$mongo）" "MongoDB が動いているか確認してください（例: sudo systemctl status mongod）"
+  else
+    warn "MONGODB_URI の接続先は、まだ確認していません" "デプロイのときに、起動の前に確認します"
+  fi
+  local mongo_port="${mongo##*:}"
+  case "$mongo" in
+    127.0.0.1:* | localhost:* | ::1:*)
+      if command -v ss >/dev/null 2>&1 &&
+        ss -ltnH 2>/dev/null | awk '{print $4}' | grep -Eq "^(0\.0\.0\.0|\*|\[::\]):${mongo_port}\$"; then
+        warn "MongoDB が外部からの接続も受け付ける設定です" "ファイアウォールでポート ${mongo_port} を閉じているか確認してください。閉じていなければ /etc/mongod.conf の bindIp を 127.0.0.1 にします"
+      fi
+      ;;
+  esac
+
+  if command -v systemctl >/dev/null 2>&1 &&
+    [ "$(systemctl is-enabled "pm2-$(id -un).service" 2>/dev/null || true)" != "enabled" ]; then
+    warn "サーバーを再起動したあと、pm2 が自動では立ち上がりません" "pm2 startup を実行し、表示された sudo で始まるコマンドを実行してください（最初のデプロイのあとで構いません）"
+  fi
+}
+
+ready() {
+  step "事前確認"
+  check
+  if [ "$ng" -gt 0 ]; then
+    printf '\nNG が %s 件あります。「→」の対処をしてから、もう一度実行してください。何も変更していません。\n' "$ng" >&2
+    exit 1
+  fi
+}
+
+settings() {
+  local mail="使えません（RESEND_API_KEY が未設定。確認ファイルと DNS は使えます）"
+  if [ -n "$(conf RESEND_API_KEY)" ]; then mail="使えます"; fi
+  printf '   公開アドレス %s ／ ポート %s ／ β 表示 %s ／ 所有者向けの追加検査 %s\n' \
+    "$(conf BASE_URL)" "$(conf PORT)" "$(conf SITE_BETA)" "$(conf ACTIVE_CHECKS)"
+  printf '   メールでの所有者確認: %s\n' "$mail"
+}
+
+healthy() {
+  [ "$(curl -fs --noproxy '*' --max-time 3 "http://127.0.0.1:$1/healthz" 2>/dev/null)" = "ok" ]
+}
+
+# Start or reload with pm2, then make sure it is our process that answers and
+# that it stays up. A port another program holds would also answer, and a
+# process that crashes every second is "online" each time pm2 looks.
+restart() {
+  local port="$1" undo="$2"
+
+  step "pm2 で起動（再読み込み）"
+  pm2 startOrReload deploy/ecosystem.config.cjs --update-env >/dev/null
+  pm2 save >/dev/null
+
+  step "動作確認"
+  local up=0 before after
+  for _ in $(seq 1 20); do
+    if healthy "$port"; then
+      up=1
+      break
+    fi
+    sleep 1
+  done
+  before="$(pm2_app)"
+  sleep 3
+  after="$(pm2_app)"
+  if [ "$up" -eq 1 ] && healthy "$port" && [ "${after%% *}" = "online" ] && [ "$before" = "$after" ]; then
+    ok "url.jp.ai が 127.0.0.1:${port} で応答しています"
+    settings
+    return
+  fi
+
+  {
+    printf '  NG    url.jp.ai が起動していません。直前のログ:\n\n'
+    pm2 logs "$APP" --lines 30 --nostream --no-color 2>&1 | tail -n 40
+    printf '\n上のログをそのまま Claude に貼ってください。\n'
+    if [ -n "$undo" ]; then printf '元の版に戻すには: %s/scripts/deploy.sh %s\n' "$PWD" "$undo"; fi
+  } >&2
+  exit 1
+}
+
+# The running process loaded its code when it started, but pm2 starts it again
+# from the files here after a crash or a reboot. So a deploy that stops half-way
+# (a failing test, a build error, a setting the new version refuses) must not
+# leave another version's files behind: the files of the running one are put back.
+# shellcheck disable=SC2317 # called by the EXIT trap in main()
+put_back() {
+  local running="$half_way"
+  [ -n "$running" ] || return 0
+  half_way=""
+  printf '\n== 動いている版（%s）のファイルに戻します\n' "$running" >&2
+  if git checkout --quiet --detach "$running" &&
+    npm ci --include=dev --no-audit --no-fund --loglevel=error >&2 &&
+    npm run --silent build >&2; then
+    printf '  OK    戻しました。サーバーは %s のまま動いています\n' "$running" >&2
+  else
+    printf '  NG    戻せませんでした。もう一度実行してください: %s/scripts/deploy.sh %s\n' "$PWD" "$running" >&2
+  fi
+}
 
 # Everything runs inside main(): bash reads a script as it goes, and the
 # checkout below may replace this very file.
 main() {
   cd "$(dirname "$0")/.."
-  ref="${1:-origin/main}"
-  port="${PORT:-3000}"
+  trap put_back EXIT
+
+  case "${1:-}" in
+    --check)
+      ready
+      printf '\nすべて OK です。デプロイできます: %s/scripts/deploy.sh\n' "$PWD"
+      exit 0
+      ;;
+    --reload)
+      ready
+      if [ ! -f dist/server.mjs ] || [ "$incomplete" -eq 1 ]; then
+        echo "この状態では再読み込みできません（まだデプロイしていないか、インストールが途中です）。先にこちらを実行してください: $PWD/scripts/deploy.sh" >&2
+        exit 1
+      fi
+      restart "$(conf PORT)" ""
+      exit 0
+      ;;
+    -*)
+      echo "使い方: deploy.sh [--check | --reload | <タグまたはコミット>]" >&2
+      exit 2
+      ;;
+  esac
+  local ref="${1:-origin/main}"
+
+  ready
 
   if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
-    echo "Tracked files were changed on this server. Commit them elsewhere or run 'git stash' first." >&2
-    git status --short --untracked-files=no >&2
+    {
+      echo "このサーバー上で、git が管理しているファイルが書き換えられています。"
+      echo "変更を捨ててよければ: git -C $PWD checkout -- .   （設定は secrets.env に書きます）"
+      git status --short --untracked-files=no
+    } >&2
     exit 1
   fi
 
-  echo "== fetch and check out $ref"
-  git fetch --tags origin
+  local previous
+  previous="$(git rev-parse --short HEAD)"
+
+  step "取得: $ref"
+  git fetch --quiet --tags origin
   git checkout --quiet --detach "$ref"
-  git log -1 --format='   %h %s (%cr)'
+  git log -1 --format='   %h %s（%cr）'
+  # From here until pm2 is reloaded, a stop puts the files of $previous back.
+  if [ "$(git rev-parse --short HEAD)" != "$previous" ]; then half_way="$previous"; fi
 
-  echo "== install, test, build"
-  npm ci --no-audit --no-fund
-  npm test
-  npm run build
+  step "インストール、テスト、ビルド（終わるまで、動いているサーバーには触れません）"
+  npm ci --include=dev --no-audit --no-fund --loglevel=error
+  local log
+  log="$(mktemp -t url-jp-ai-test.XXXXXX)"
+  if ! npm test >"$log" 2>&1; then
+    grep -E '^(not ok|✖) |^(#|ℹ) (tests|pass|fail) ' "$log" >&2 || true
+    echo "テストが失敗しました。動いているサーバーには触れていません。全文: $log" >&2
+    exit 1
+  fi
+  printf '   テスト: %s 件すべて通過\n' "$(sed -n -E 's/^(#|ℹ) pass //p' "$log")"
+  rm -f "$log"
+  npm run --silent build
 
-  echo "== start or reload with pm2"
-  pm2 startOrReload deploy/ecosystem.config.cjs --update-env
-  pm2 save
+  local wrong
+  if ! wrong="$(preflight settings)" || ! wrong="$(preflight database)"; then
+    {
+      echo "この版は、いまの設定では起動できません: ${wrong:-起動前の確認を実行できませんでした}"
+      echo "動いているサーバーには触れていません。"
+      # After the files are put back, --check would ask the old version instead.
+      if [ -z "$half_way" ]; then echo "どこを直すかは、こちらで確認できます: $PWD/scripts/deploy.sh --check"; fi
+    } >&2
+    exit 1
+  fi
 
-  echo "== health check"
-  for _ in 1 2 3 4 5 6 7 8 9 10; do
-    if curl -fsS -o /dev/null "http://127.0.0.1:${port}/"; then
-      echo "   OK: url.jp.ai answers on 127.0.0.1:${port}"
-      exit 0
-    fi
-    sleep 1
-  done
-  echo "url.jp.ai did not answer on 127.0.0.1:${port}. See: pm2 logs url-jp-ai --lines 50" >&2
-  exit 1
+  half_way=""
+  restart "$(conf PORT)" "$previous"
+  local current
+  current="$(git rev-parse --short HEAD)"
+  if [ "$current" = "$previous" ]; then
+    printf '   版: %s\n' "$current"
+  else
+    printf '   版: %s（ひとつ前は %s。戻すには: %s/scripts/deploy.sh %s）\n' "$current" "$previous" "$PWD" "$previous"
+  fi
 }
 
-main "$@"
+# "exit" on the same line: nothing more is read from a file that may have changed.
+main "$@"; exit

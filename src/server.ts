@@ -15,11 +15,8 @@ const config = loadConfig();
 let store: Store;
 if (config.mongoUri) {
   store = await MongoStore.connect(config.mongoUri, config.mongoDb);
-} else if (process.env.NODE_ENV === 'production') {
-  // Limits and the audit log must survive a restart in production.
-  console.error('MONGODB_URI is required when NODE_ENV=production');
-  process.exit(1);
 } else {
+  // Development only: loadConfig refuses production without MONGODB_URI.
   console.warn('MONGODB_URI is not set: results, limits and the audit log are kept in memory only');
   store = new MemoryStore();
 }

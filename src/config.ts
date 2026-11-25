@@ -98,6 +98,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     // Development only: a new secret per start, so owners are signed out on restart.
     sessionSecret = randomBytes(32).toString('base64url');
   }
+  // Limits and the audit log must survive a restart in production.
+  if (production && !env.MONGODB_URI) throw new Error('MONGODB_URI is required when NODE_ENV=production');
   const betaRaw = (env.SITE_BETA ?? 'off').toLowerCase();
   if (!['on', 'off'].includes(betaRaw)) throw new Error('SITE_BETA must be on or off');
   const activeRaw = (env.ACTIVE_CHECKS ?? 'on').toLowerCase();
