@@ -47,6 +47,20 @@ pm2_app() {
 
 port_in_use() { (exec 3<>"/dev/tcp/127.0.0.1/$1") 2>/dev/null; }
 
+# The server's own rules for its settings (src/config.ts), applied to what pm2
+# would hand it. Asked before pm2 is touched: a typing mistake in the secrets
+# file must not replace a running server with one that cannot start.
+# Needs the installed packages, so it is skipped before the first install.
+# Prints what is wrong and fails; prints nothing when the settings are fine.
+settings_error() {
+  [ -d node_modules/tsx ] || return 0
+  node --import tsx -e '
+    Object.assign(process.env, require("./deploy/ecosystem.config.cjs").apps[0].env);
+    import("./src/config.ts")
+      .then(({ loadConfig }) => loadConfig())
+      .catch((err) => (console.log(err.message), process.exit(1)));' 2>&1
+}
+
 # Is this server ready? Changes nothing. Counts in $ng what would make a deploy
 # fail or be unsafe, and says what to do about each.
 check() {
@@ -87,6 +101,13 @@ check() {
     else
       bad "SESSION_SECRET がないか、32 文字未満です" "echo \"SESSION_SECRET=\$(openssl rand -base64 48)\" >> \"$secrets\""
     fi
+  fi
+
+  # Only when nothing above failed, so that one mistake is reported once.
+  local wrong
+  if [ "$ng" -eq 0 ] && ! wrong="$(settings_error)"; then
+    bad "設定に誤りがあります: $wrong" "$secrets を直してください"
+    return # the port and the database address below come from these settings
   fi
 
   local port status
@@ -246,9 +267,20 @@ main() {
   rm -f "$log"
   npm run --silent build
 
+  local wrong
+  if ! wrong="$(settings_error)"; then
+    echo "この版では設定が通りません: $wrong （動いているサーバーには触れていません）" >&2
+    exit 1
+  fi
+
   restart "$(conf PORT)" "$previous"
-  printf '   版: %s（ひとつ前は %s。戻すには: %s/scripts/deploy.sh %s）\n' \
-    "$(git rev-parse --short HEAD)" "$previous" "$PWD" "$previous"
+  local current
+  current="$(git rev-parse --short HEAD)"
+  if [ "$current" = "$previous" ]; then
+    printf '   版: %s\n' "$current"
+  else
+    printf '   版: %s（ひとつ前は %s。戻すには: %s/scripts/deploy.sh %s）\n' "$current" "$previous" "$PWD" "$previous"
+  fi
 }
 
 # "exit" on the same line: nothing more is read from a file that may have changed.
