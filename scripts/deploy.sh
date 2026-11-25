@@ -307,7 +307,10 @@ main() {
 
   local wrong
   if ! wrong="$(settings_error)" || ! wrong="$(database_error)"; then
-    echo "この版は、いまの設定では起動できません: $wrong （動いているサーバーには触れていません）" >&2
+    {
+      echo "この版は、いまの設定では起動できません: $wrong"
+      echo "動いているサーバーには触れていません。どこを直すかは、こちらで確認できます: $PWD/scripts/deploy.sh --check"
+    } >&2
     exit 1
   fi
 

@@ -94,15 +94,22 @@ Then, from anywhere:
 ```
 
 Every run starts with the checks of `--check`: Node.js 22, the secrets file and
-its permissions, `SESSION_SECRET`, that the port is free or ours, that MongoDB
-answers. It stops there, having changed nothing, if one fails, and says what
-to do. A deploy then checks out the version, runs `npm ci`, the tests and the
-build, and only after all of that reloads pm2. It then makes sure that it is
-this process that answers on `/healthz` and that it stays up: a port held by
-another program also answers, and a process that crashes every second looks
-"online" each time pm2 is asked. On failure it prints the last log lines and
-the command that returns to the version before. What the script prints is
-Japanese, like everything else an operator or visitor reads.
+its permissions, `SESSION_SECRET`, the settings against the server's own rules,
+that the port is free or ours, that MongoDB answers and lets the server in
+(`scripts/preflight.ts`: a wrong database password is found here, not by a
+server that cannot start). It stops there, having changed nothing, if one
+fails, and says what to do. A deploy then checks out the version, runs
+`npm ci`, the tests and the build, asks the new version whether it could start
+with these settings, and only after all of that reloads pm2. If it stops
+before the reload (a failing test, a build error, a refused setting), it puts
+the files of the running version back: pm2 starts the process again from these
+files after a crash or a reboot, so they must not stay at a version that
+failed. After the reload it makes sure that it is this process that answers on
+`/healthz` and that it stays up: a port held by another program also answers,
+and a process that crashes every second looks "online" each time pm2 is asked.
+On failure it prints the last log lines and the command that returns to the
+version before. What the script prints is Japanese, like everything else an
+operator or visitor reads.
 
 `deploy/ecosystem.config.cjs` holds no secrets. They come from
 `~/.config/url-jp-ai/secrets.env` (or the file named by `URL_JP_AI_SECRETS`),

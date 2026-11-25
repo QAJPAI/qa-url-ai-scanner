@@ -51,5 +51,7 @@ posts; the tests set `Origin` themselves.
 - Rule: before handing over a procedure, run every command of it on a clean machine as an unprivileged user, and write down what could not be run there (certbot, DNS, mail) as "not verified".
 - Rule: a health check must prove identity and stability, not reachability: ask the app's own endpoint, and require the process manager to report the same process, still up, a few seconds later.
 - Rule: validate settings with the program's own rules before restarting it. A typing mistake must fail the command, not the running service.
+- Rule: a fix that claims a class ("a wrong setting cannot take the server down") is tested with each kind of member, not only the one that prompted it. The first fix checked the rules in `src/config.ts`; a wrong database password passes every rule and still stopped the server. Ask of each setting: what does the program do with it at start, and has that been tried?
+- Rule: "the running server is untouched" must also hold for the files it restarts from. A process manager starts the process again after a crash or a reboot, from whatever is on disk.
 - Rule: check the facts a step depends on rather than the user's report of them ("the tag is made"): `v0.12.0` existed but pointed at the commit of `v0.11.0`.
 

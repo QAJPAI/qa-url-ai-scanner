@@ -182,6 +182,22 @@ iQi asked for the procedure to be reviewed again and rewritten. The first one
   - A mistake in the secrets file took the running server down on reload.
     The settings are now loaded with `src/config.ts` before pm2 is touched.
   - The health check read the port from the shell, not from pm2's settings.
+- Found by a second rehearsal, with a MongoDB that asks for a password:
+  - A wrong database password still took the running server down on reload.
+    The check before pm2 looked for a listening port, and anything listens.
+    `scripts/preflight.ts` now opens the database (a read-only listing) in
+    `--check` and again after the build, before pm2 is touched. Tried: right
+    password, wrong password, no credentials where they are needed, nothing
+    listening, a malformed address, an `mongodb+srv` name that does not
+    resolve. With the right one: 50 of 50 store tests through the same address.
+  - A deploy that stopped at a failing test left the new version's files and
+    packages under the process still running the old one. pm2 would have
+    started the old build against them after a crash or a reboot. The files
+    of the running version are now put back; a pm2 restart afterwards came up.
+  - `--reload` before the first deploy started nothing and printed a log; it
+    now says to deploy first.
+  - Rolling back to a version from before `preflight.ts` (today's main) and
+    forward again works with either script on disk.
 - Measured: a deploy makes nginx answer 502 for about 0.4 seconds, at the
   moment pm2 swaps the process (6 of 254 requests at 20 a second). Nothing
   fails during install, test or build.
