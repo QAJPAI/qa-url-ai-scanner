@@ -53,5 +53,8 @@ posts; the tests set `Origin` themselves.
 - Rule: validate settings with the program's own rules before restarting it. A typing mistake must fail the command, not the running service.
 - Rule: a fix that claims a class ("a wrong setting cannot take the server down") is tested with each kind of member, not only the one that prompted it. The first fix checked the rules in `src/config.ts`; a wrong database password passes every rule and still stopped the server. Ask of each setting: what does the program do with it at start, and has that been tried?
 - Rule: "the running server is untouched" must also hold for the files it restarts from. A process manager starts the process again after a crash or a reboot, from whatever is on disk.
+- Rule: have someone who did not write it read it, given the code and not my conclusions. After two rehearsals of my own, a fresh reader still found ten things, because I rehearsed the states I had thought of: an interrupted install, a setting whose line is deleted, a process started from another folder were not among them.
+- Rule: a check that cannot run is not a failed check. Give "the question itself failed" its own exit code, or the tool reports a broken install as a wrong setting and blocks the command that would repair it.
+- Rule: know how the process manager treats settings before promising what a settings file does. pm2 merges and never removes; what the script printed about the settings was read from the file, not from the process.
 - Rule: check the facts a step depends on rather than the user's report of them ("the tag is made"): `v0.12.0` existed but pointed at the commit of `v0.11.0`.
 

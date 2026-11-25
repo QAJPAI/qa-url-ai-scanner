@@ -111,12 +111,21 @@ On failure it prints the last log lines and the command that returns to the
 version before. What the script prints is Japanese, like everything else an
 operator or visitor reads.
 
+Three things it also guards against, each met in rehearsal or review: an
+install that was interrupted (the next `--check` says so, and a deploy installs
+again); a pm2 process of the same name started from another folder (pm2 would
+restart that folder's build); and `NODE_ENV=production` in the operator's
+shell (`npm ci --include=dev`, or the tests and the build could not run).
+
 `deploy/ecosystem.config.cjs` holds no secrets. They come from
 `~/.config/url-jp-ai/secrets.env` (or the file named by `URL_JP_AI_SECRETS`),
 whose values override the defaults in that file, so nothing on the server
 needs editing inside the repository. Server-specific settings go there too:
 `PORT=3100` when 3000 is taken, `SITE_BETA=off` to end the beta,
 `ACTIVE_CHECKS=off` to stop active checks at once (then `deploy.sh --reload`).
+Deleting a line returns that setting to its default on the next reload: pm2
+by itself never removes a setting it was once given, so the pm2 file declares
+every setting the server reads, empty where there is no default.
 
 nginx in front: see [deploy/nginx.conf.example](deploy/nginx.conf.example).
 Without `MONGODB_URI` the server keeps everything in memory (development only;

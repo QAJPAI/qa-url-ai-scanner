@@ -198,6 +198,37 @@ iQi asked for the procedure to be reviewed again and rewritten. The first one
     now says to deploy first.
   - Rolling back to a version from before `preflight.ts` (today's main) and
     forward again works with either script on disk.
+- An independent review of `deploy.sh` (a second reader given the code, not
+  my conclusions) returned ten findings. Each was reproduced on the rehearsal
+  machine, fixed, and tried again there:
+  - An interrupted `npm ci` left the packages incomplete; every later run
+    then reported a module error as a wrong setting and stopped, the
+    repairing deploy included. Now: `--check` says the install is incomplete,
+    a deploy installs again, `--reload` refuses.
+  - `NODE_ENV=production` in the operator's shell made `npm ci` leave out tsx
+    and esbuild. Now `npm ci --include=dev`.
+  - A `PORT` changed to one another program holds passed the check, because
+    the process was "online". The check compares with the running port.
+  - A pm2 process named url-jp-ai started from another folder: `startOrReload`
+    restarts that folder's build. Now an NG that names the folder.
+  - `MONGODB_URI=` (empty) passed and the server then refused to start. The
+    rule moved from `server.ts` into `loadConfig`.
+  - pm2 keeps a setting after its line is deleted (confirmed in
+    `/proc/<pid>/environ`): a removed `RESEND_API_KEY` stayed in the process
+    while the script said mail was off. The pm2 file now declares every
+    setting; `test/deploy.test.ts` keeps it in step with `src/config.ts`.
+  - A database password with an unescaped `@` showed its tail as a host name.
+  - Node 24 prints test results in another format; both are read.
+  - A secrets file made with sudo ended in a stack trace; one mistake was
+    reported twice; advice pointed at `--check` after the files were put back.
+  - The nginx example names the certbot command and the SELinux boolean.
+- Left as it is, and why: installing in place means the packages change under
+  a running process for the seconds an install takes. Page requests during a
+  deploy did not fail (measured below); the reviewer read that the HTTP client
+  the engine uses may load a file on its first outgoing request, so the very
+  first check after a start could fail if it falls in those seconds. Not
+  reproduced here (no outbound network). Building each version in its own
+  folder and switching would remove it; not worth the moving parts for a beta.
 - Measured: a deploy makes nginx answer 502 for about 0.4 seconds, at the
   moment pm2 swaps the process (6 of 254 requests at 20 a second). Nothing
   fails during install, test or build.
