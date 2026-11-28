@@ -209,7 +209,7 @@ function signOutForm(): Html {
   return html`<form method="post" action="/owner/sign-out" class="signout"><button type="submit" class="secondary">${ownerText.signOut}</button></form>`;
 }
 
-function finding(r: Extract<AssessmentRecord, { verdict: 'confirmed' }>): Html {
+export function finding(r: Extract<AssessmentRecord, { verdict: 'confirmed' }>): Html {
   const text = ja.findingTextFor(r.layer, r.code);
   return html`<li class="finding sev-${r.severity}">
 <p class="title"><span class="sev">${r.severity}・${ja.severityLabel[r.severity]}</span> ${text?.title ?? r.code}（${r.ruleId}）</p>
@@ -221,7 +221,7 @@ function finding(r: Extract<AssessmentRecord, { verdict: 'confirmed' }>): Html {
 </li>`;
 }
 
-function question(r: Extract<AssessmentRecord, { verdict: 'needs_validation' }>): Html {
+export function question(r: Extract<AssessmentRecord, { verdict: 'needs_validation' }>): Html {
   const text = ja.needsValidationText[r.code];
   return html`<li class="finding">
 <p class="title">${text?.title ?? r.code}（${r.ruleId}）</p>
@@ -257,7 +257,7 @@ ${items.length === 0 ? html`<p class="none">${c.none}</p>` : html`<ol class="fin
  * What changed since the first check of this session. Every judgement here
  * is the engine's (compareAssessments); the page only lays it out.
  */
-function changesSection(cmp: Comparison): Html {
+export function changesSection(cmp: Comparison): Html {
   const bySeverity = (a: Confirmed, b: Confirmed) => a.severity.localeCompare(b.severity);
   const fixed = [...cmp.fixed].sort(bySeverity).map((r) => {
     const note = ja.afterFixNoteFor(r.layer, r.code);
@@ -278,6 +278,37 @@ ${changeList(c.newHeading(cmp.newConfirmed.length), [...cmp.newConfirmed].sort(b
 <p>${c.questionsLine(cmp.questionsResolved.length, cmp.questionsOpen.length, cmp.questionsNew.length, cmp.questionsUnverified.length)}</p>
 <p class="note">${c.meaning}</p>
 </section>`;
+}
+
+/** The grade with what it covers, the counts, and which kinds of access ran. */
+export function gradeSummary(assessment: Assessment): Html {
+  const s = summarize(assessment, 'owner');
+  // Say what actually ran: with active checks switched off, only page-view-level access did.
+  const ranActive = assessment.coverage.some((u) => u.mode === 'active');
+  return html`<p class="kicker">${t.grade}<small>${ownerText.gradeScope(s.coverage.total, s.coverage.checked + s.coverage.partial)}</small></p>
+<div class="grade grade-${s.grade}">
+<span class="letter">${s.grade}</span>
+<span class="label">${ja.gradeLabel[s.grade]}</span>
+</div>
+<ul class="facts">
+<li>${t.counts}: P0（${ja.severityLabel.P0}）${s.counts.P0} ${t.countUnit} / P1（${ja.severityLabel.P1}）${s.counts.P1} ${t.countUnit} / P2（${ja.severityLabel.P2}）${s.counts.P2} ${t.countUnit}</li>
+<li>${t.needsValidationCount}: ${s.needsValidation} ${t.countUnit}</li>
+<li>${t.coverageLine(s.coverage.total, s.coverage.checked, s.coverage.partial)}</li>
+${s.coverage.error > 0 ? html`<li class="warn">${t.incomplete(s.coverage.error)}</li>` : ''}
+<li>${ranActive ? t.checksOwner : t.checksPublic}</li>
+</ul>`;
+}
+
+/** Every rule with what was and was not examined: a rule that was not examined is never shown as passed. */
+export function coverageTable(assessment: Assessment): Html {
+  return html`<table class="coverage">
+<thead><tr><th>${ownerText.coverageRule}</th><th>${ownerText.coverageStatus}</th></tr></thead>
+<tbody>
+${assessment.coverage.map(
+  (u) => html`<tr><td>${u.ruleId} ${ja.ruleTitle[u.ruleId]}</td><td>${ja.coverageStatusLabel[u.status]}${coverageDetail(u) ? `（${coverageDetail(u)}）` : ''}</td></tr>`,
+)}
+</tbody>
+</table>`;
 }
 
 /** The request to paste into an AI coding tool. The text is the engine's; shown when there is something to fix. */
@@ -309,9 +340,6 @@ export function ownerReportPage(
   session: OwnerSession,
   comparison?: Comparison,
 ): string {
-  const s = summarize(assessment, 'owner');
-  // Say what actually ran: with active checks switched off, only page-view-level access did.
-  const ranActive = assessment.coverage.some((u) => u.mode === 'active');
   const host = assessment.target.layer === 'url' ? assessment.target.host : assessment.target.ref;
   const confirmed = assessment.records
     .filter((r): r is Extract<AssessmentRecord, { verdict: 'confirmed' }> => r.verdict === 'confirmed')
@@ -329,18 +357,7 @@ export function ownerReportPage(
 <dt>${t.scannedAt}</dt><dd>${when(assessment.startedAt)}</dd>
 </dl>
 <p class="note">${ownerText.verifiedBy(ownerText.sessionMethod[session.method], session.email)}</p>
-<p class="kicker">${t.grade}<small>${ownerText.gradeScope(s.coverage.total, s.coverage.checked + s.coverage.partial)}</small></p>
-<div class="grade grade-${s.grade}">
-<span class="letter">${s.grade}</span>
-<span class="label">${ja.gradeLabel[s.grade]}</span>
-</div>
-<ul class="facts">
-<li>${t.counts}: P0（${ja.severityLabel.P0}）${s.counts.P0} ${t.countUnit} / P1（${ja.severityLabel.P1}）${s.counts.P1} ${t.countUnit} / P2（${ja.severityLabel.P2}）${s.counts.P2} ${t.countUnit}</li>
-<li>${t.needsValidationCount}: ${s.needsValidation} ${t.countUnit}</li>
-<li>${t.coverageLine(s.coverage.total, s.coverage.checked, s.coverage.partial)}</li>
-${s.coverage.error > 0 ? html`<li class="warn">${t.incomplete(s.coverage.error)}</li>` : ''}
-<li>${ranActive ? t.checksOwner : t.checksPublic}</li>
-</ul>
+${gradeSummary(assessment)}
 <p class="box gated">${ownerText.reportPrivate}</p>
 </section>
 ${comparison ? changesSection(comparison) : ''}
@@ -355,14 +372,7 @@ ${questions.length === 0 ? html`<p>${ownerText.needsNone}</p>` : html`<ol class=
 ${confirmed.length > 0 ? fixRequestSection(assessment, session) : ''}
 <section>
 <h2>${heading(t.coverageHeading)}</h2>
-<table class="coverage">
-<thead><tr><th>${ownerText.coverageRule}</th><th>${ownerText.coverageStatus}</th></tr></thead>
-<tbody>
-${assessment.coverage.map(
-  (u) => html`<tr><td>${u.ruleId} ${ja.ruleTitle[u.ruleId]}</td><td>${ja.coverageStatusLabel[u.status]}${coverageDetail(u) ? `（${coverageDetail(u)}）` : ''}</td></tr>`,
-)}
-</tbody>
-</table>
+${coverageTable(assessment)}
 <p class="note">${t.disclaimer}</p>
 <p class="note">${t.rulesVersion}: v${assessment.rulesVersion}</p>
 </section>

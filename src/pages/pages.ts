@@ -3,6 +3,7 @@
 import { cleanText, ENGINE_VERSION, ja, type PublicSummary, RULES_VERSION } from 'qa-jp-ai-scanner';
 import type { Config } from '../config';
 import { SITE_VERSION } from '../version';
+import { faqSection } from './faq';
 import { type Html, html } from './html';
 import { site } from './text';
 
@@ -75,7 +76,12 @@ export function preReleaseBox(ctx: PageContext): Html {
 </section>`;
 }
 
-export function homePage(ctx: PageContext): string {
+/**
+ * The home page. `sample` is the excerpt of the sample result; it is passed in
+ * because the sample is laid out by the owner pages, which build on this file.
+ */
+export function homePage(ctx: PageContext, sample: Html): string {
+  const budgetSeconds = Math.round(ctx.config.limits.scanBudgetMs / 1000);
   return layout(
     ctx,
     site.name,
@@ -84,6 +90,14 @@ export function homePage(ctx: PageContext): string {
 <p>${site.description}</p>
 ${checkForm()}
 </section>
+<ul class="points" aria-label="${site.pointsLabel}">
+${site.points(budgetSeconds).map((p) => html`<li><strong>${p.title}</strong><span>${p.text}</span></li>`)}
+</ul>
+<section class="box">
+<h2>${site.audienceHeading}</h2>
+<ul>${site.audience.map((line) => html`<li>${line}</li>`)}</ul>
+</section>
+${sample}
 <section class="box">
 <h2>${site.whatWeDoHeading}</h2>
 <ul>${site.whatWeDo.map((line) => html`<li>${line}</li>`)}</ul>
@@ -92,7 +106,8 @@ ${checkForm()}
 <h2>${site.ownerHeading}</h2>
 <p>${site.ownerText}</p>
 </section>
-${preReleaseBox(ctx)}`,
+${preReleaseBox(ctx)}
+${faqSection(ctx.config)}`,
   );
 }
 

@@ -47,6 +47,18 @@ layer only, so url.jp.ai and the engine's reports never disagree.
 The result page also points to QA.JP.AI's free pre-release check, for finding
 problems in the code before it is published.
 
+**Before anyone types a URL.** The home page says who the check is for, what
+sets it apart (no sign-up, a result on the spot, no tracking, fixing and
+confirming the fix at no cost), and answers the usual questions; the numbers
+in those answers are read from the settings in force. `/sample` shows what a
+verified owner gets: a first result, the fix request, and the re-check after
+the fix. It is a made-up site (`example.jp`) and says so at the top and at the
+end, but nothing else is invented: the two assessments are built with the
+engine's record factory and coverage ledger, every sentence about a problem is
+the engine's, what counts as fixed is decided by `compareAssessments()`, and
+the page is laid out by the same functions as a real owner result. It has no
+form and runs no check.
+
 ## Safeguards
 
 | | |
