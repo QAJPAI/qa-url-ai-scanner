@@ -100,6 +100,28 @@ button.secondary:hover { background: var(--accent-soft); color: var(--accent-tex
 .box p:last-child { margin-bottom: 0; }
 .gated { border-left: 3px solid var(--accent); }
 
+/* Home page: what sets the service apart, the sample, and the questions. */
+.points { list-style: none; margin: 2rem 0 0; padding: 0; display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.75rem; }
+@media (max-width: 34rem) { .points { grid-template-columns: 1fr; } }
+.points li { padding: 0.85rem 1rem; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); }
+.points strong { display: block; color: var(--accent-text); }
+.points span { display: block; color: var(--ink-2); font-size: 0.88rem; line-height: 1.65; margin-top: 0.15rem; }
+a.button.secondary { background: transparent; color: var(--accent-text); border: 1px solid var(--line-2); }
+a.button.secondary:hover { background: var(--accent-soft); color: var(--accent-text); }
+.box .findings.plain { list-style: none; margin: 1rem 0; padding: 0.9rem 1rem 0; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); }
+.faq { margin: 2.5rem 0 0; }
+.faq details { border-bottom: 1px solid var(--line); }
+.faq details:first-of-type { border-top: 1px solid var(--line); }
+.faq summary { cursor: pointer; padding: 0.8rem 0.25rem; font-weight: 600; }
+.faq summary:hover { color: var(--accent-text); }
+.faq summary:focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 40%, transparent); border-radius: 4px; }
+.faq details > p, .faq details > ul { margin: 0 0 0.9rem; padding-left: 1.4rem; color: var(--ink-2); }
+.faq details > ul { padding-left: 2.8rem; }
+
+/* The sample result: marked as a sample at the top, at every step and at the end. */
+.sample-note { background: var(--new-bg); color: var(--new-fg); border-color: var(--new-line); }
+.step { margin: 2.75rem 0 1rem; padding: 0.35rem 0.8rem; border-left: 3px solid var(--gold); background: var(--surface); color: var(--gold); font-weight: 600; }
+
 /* Results. */
 .meta { display: grid; grid-template-columns: max-content 1fr; gap: 0.25rem 1rem; margin: 0 0 1.25rem; }
 .meta dt { color: var(--ink-3); }

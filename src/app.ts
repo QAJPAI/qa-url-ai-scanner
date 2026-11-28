@@ -9,6 +9,7 @@ import { BodyTooLargeError, clientIp, isSameOrigin, readForm } from './http/requ
 import { BusyError, ConcurrencyLimiter } from './limiter';
 import { createOwnerRoutes, type OwnerDeps } from './owner';
 import { aboutPage, homePage, messagePage, privacyPage, resultPage, termsPage } from './pages/pages';
+import { samplePage, sampleTeaser } from './pages/sample';
 import { site } from './pages/text';
 import type { AuditOutcome, Store } from './store/types';
 
@@ -168,7 +169,9 @@ export function createApp(deps: AppDeps): Handler {
 
     switch (path) {
       case '/':
-        return send(res, 200, homePage(ctx));
+        return send(res, 200, homePage(ctx, sampleTeaser(now())));
+      case '/sample':
+        return send(res, 200, samplePage(ctx, now()));
       case '/about':
         return send(res, 200, aboutPage(ctx));
       case '/terms':

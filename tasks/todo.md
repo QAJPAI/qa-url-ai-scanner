@@ -109,6 +109,35 @@ Still open for step 2:
       owner details never outlive the proof that allowed them. After 24 hours
       the owner verifies again and starts from a fresh first check.
 
+## Step 4: the home page explains itself (2026-11-29)
+
+Asked for after comparing url.jp.ai with a commercial diagnosis service
+(ホリエのサイバーポリス). Its home page tells a visitor why to check, shows a
+sample report and answers six questions; ours had an input box and four
+bullet points. Three things were taken from that, and only those.
+
+- [x] A sample of the result. The home page shows the most serious problem of
+      the sample and links to `/sample`: first result, fix request, re-check.
+      A made-up site (`example.jp`), marked as a sample at the top and the end.
+      Built with the engine's record factory, ledger, wording and
+      `compareAssessments()`, and laid out by the owner page's own functions
+      (`finding`, `question`, `gradeSummary`, `coverageTable`,
+      `changesSection`), so it cannot show what a real result does not.
+- [x] Frequently asked questions on the home page: nine, in `<details>` (no
+      script). Each answer restates what the service does or what the terms
+      and privacy policy say; retention, reuse and the check's time budget are
+      read from the settings, and what is switched off is not described.
+- [x] Who it is for (three lines) and four points that set it apart: no
+      sign-up, a result on the spot, no tracking, fixing and confirming the
+      fix at no cost.
+- [ ] When the engine pin moves to 0.12.0 (PR #3): add the "rules a site
+      check cannot examine" section to the sample, from the same function the
+      owner result uses.
+
+Deliberately not taken from the other service: sign-up before a result,
+advertising tags and device fingerprinting, fear-led wording, an identity
+document as proof of ownership, and a pointer to paid fixing work.
+
 ## Decided (2026-11-20)
 
 1. Email: Resend first; Cloudflare Email Service possible later.
